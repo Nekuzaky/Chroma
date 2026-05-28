@@ -1,0 +1,6 @@
+{
+    "name": "Hierarchy.Editor",
+    "includePlatforms": [
+        "Editor"
+    ]
+}

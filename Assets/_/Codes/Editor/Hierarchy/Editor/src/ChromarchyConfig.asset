@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 550ec41fe696ad64ea943eebdcdf45e5, type: 3}
+  m_Name: ChromarchyConfig
+  m_EditorClassIdentifier: Chromarchy.Editor::Chromarchy.Editor.ChromarchyConfig
+  m_enableHeaders: 1
+  m_enableChildCount: 1
+  m_enableTreeLines: 1
+  m_treeLineColor: {r: 1, g: 1, b: 1, a: 0.15}
+  m_enableChildInherit: 1
+  m_childInheritMode: 1
+  m_childInheritOpacity: 0.25
+  m_childInheritFalloff: 0.831
+  m_autoColorRules:
+  - m_enabled: 1
+    m_match: 0
+    m_value: Player
+    m_color: {r: 0.82427204, g: 1, b: 0, a: 0.18}
+  m_presets:
+  - m_key: h1
+    m_spec: '#1f6feb center bold s12 text:white'
+  - m_key: h2
+    m_spec: gray left bold text:white
+  - m_key: h3
+    m_spec: '#3a3f44 left italic text:white'
+  - m_key: cat
+    m_spec: '#444 left bold text:white'
+  - m_key: grad
+    m_spec: '#1f6feb>#7b2ff7 center bold text:white'
+  m_version: 392
