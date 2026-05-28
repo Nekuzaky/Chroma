@@ -13,9 +13,14 @@ MonoBehaviour:
   m_Name: ChromarchyConfig
   m_EditorClassIdentifier: Chromarchy.Editor::Chromarchy.Editor.ChromarchyConfig
   m_enableHeaders: 1
-  m_enableChildCount: 1
   m_enableTreeLines: 1
-  m_treeLineColor: {r: 1, g: 1, b: 1, a: 0.15}
+  m_treeLineColor: {r: 0.16907978, g: 1, b: 0, a: 0.15}
+  m_enableSeparators: 1
+  m_separatorColor: {r: 0.757576, g: 1, b: 0, a: 1}
+  m_separatorFillColor: {r: 0.22, g: 0.22, b: 0.22, a: 1}
+  m_separatorBold: 1
+  m_separatorItalic: 0
+  m_separatorUppercase: 0
   m_enableChildInherit: 1
   m_childInheritMode: 1
   m_childInheritOpacity: 0.25
@@ -36,4 +41,4 @@ MonoBehaviour:
     m_spec: '#444 left bold text:white'
   - m_key: grad
     m_spec: '#1f6feb>#7b2ff7 center bold text:white'
-  m_version: 392
+  m_version: 571
