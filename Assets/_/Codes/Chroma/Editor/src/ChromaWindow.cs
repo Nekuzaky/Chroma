@@ -5,11 +5,11 @@ using UnityEditor;
 using UnityEditor.AnimatedValues;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 // Chroma control panel. Open via Tools/Chroma or GameObject/Chroma/Open Window.
 // Two tabs: "Selection" (everything about the selected object) and "Settings" (global config).
-public class ChromarchyWindow : EditorWindow
+public class ChromaWindow : EditorWindow
 {
     private enum Tab { Selection, Settings }
     private enum OutputMode { Name, Component }
@@ -19,9 +19,9 @@ public class ChromarchyWindow : EditorWindow
 
     private void OnEnable()
     {
-        _config = ChromarchyConfig.GetOrCreate();
+        _config = ChromaConfig.GetOrCreate();
         _so = new SerializedObject(_config);
-        ChromarchyHeaders.OnConfigChanged(_config);
+        ChromaHeaders.OnConfigChanged(_config);
         wantsMouseMove = true; // live hover highlight on section headers
         _tab = (Tab)EditorPrefs.GetInt("Chroma.Tab", 0);
     }
@@ -58,7 +58,7 @@ public class ChromarchyWindow : EditorWindow
     [MenuItem("Tools/Chroma")]
     private static void Open()
     {
-        var win = GetWindow<ChromarchyWindow>("Chroma");
+        var win = GetWindow<ChromaWindow>("Chroma");
         win.minSize = new Vector2(360f, 480f);
     }
 
@@ -138,7 +138,7 @@ public class ChromarchyWindow : EditorWindow
     private bool BeginSection(string title, string key)
     {
         EditorGUILayout.Space(4);
-        string prefKey = "Chromarchy.Fold." + key;
+        string prefKey = "Chroma.Fold." + key;
         bool open = EditorPrefs.GetBool(prefKey, true);
 
         Rect rect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
@@ -233,19 +233,31 @@ public class ChromarchyWindow : EditorWindow
             EditorStyles.miniLabel);
 
         EditorGUILayout.Space(6);
-        bool editing = count == 1 && _selSource != SelSource.None;
+        bool nameEditing = count == 1 && _selSource == SelSource.NameBanner;
         using (new EditorGUI.DisabledScope(count == 0))
         {
             Color prev = GUI.backgroundColor;
-            if (count > 0) GUI.backgroundColor = _accent;
-            string label = (editing ? "Apply changes" : "Apply banner") + " (" + count + ")";
-            if (GUILayout.Button(label, GUILayout.Height(28)))
-                ApplyDraft();
-            GUI.backgroundColor = prev;
+            if (nameEditing)
+            {
+                // Editing an existing banner: renaming is the common case, so title-only is the
+                // primary action (keeps colors byte-for-byte). Full rewrite is the secondary one.
+                if (count > 0) GUI.backgroundColor = _accent;
+                if (GUILayout.Button("Apply title only (" + count + ")", GUILayout.Height(28)))
+                    ApplyTitleOnly();
+                GUI.backgroundColor = prev;
+                if (GUILayout.Button("Apply changes  (colors too)", GUILayout.Height(20)))
+                    ApplyDraft();
+            }
+            else
+            {
+                bool editing = count == 1 && _selSource != SelSource.None;
+                if (count > 0) GUI.backgroundColor = _accent;
+                string label = (editing ? "Apply changes" : "Apply banner") + " (" + count + ")";
+                if (GUILayout.Button(label, GUILayout.Height(28)))
+                    ApplyDraft();
+                GUI.backgroundColor = prev;
+            }
         }
-        if (count == 1 && _selSource == SelSource.NameBanner)
-            if (GUILayout.Button("Apply title only  (keep colors)", GUILayout.Height(20)))
-                ApplyTitleOnly();
 
         EditorGUILayout.EndVertical();
 
@@ -378,7 +390,7 @@ public class ChromarchyWindow : EditorWindow
             return;
         }
 
-        if (ChromarchyHeaders.TryParseEditable(go.name, out ChromarchyHeaders.EditableBanner e) && e.m_valid)
+        if (ChromaHeaders.TryParseEditable(go.name, out ChromaHeaders.EditableBanner e) && e.m_valid)
         {
             _selSource = SelSource.NameBanner;
             _outputMode = OutputMode.Name;
@@ -487,7 +499,7 @@ public class ChromarchyWindow : EditorWindow
     // Recolors the selection: sets the component color if there is one, else rewrites the name's color.
     private void RecolorSelection(string colorToken)
     {
-        ChromarchyHeaders.TryGetColor(colorToken, out Color col);
+        ChromaHeaders.TryGetColor(colorToken, out Color col);
         foreach (GameObject go in Selection.gameObjects)
         {
             if (go == null) continue;
@@ -516,9 +528,9 @@ public class ChromarchyWindow : EditorWindow
         using (new EditorGUI.DisabledScope(sel == 0))
             if (GUILayout.Button("Bookmark selection (" + sel + ")"))
                 foreach (GameObject go in Selection.gameObjects)
-                    ChromarchyBookmarks.Add(go);
+                    ChromaBookmarks.Add(go);
 
-        IReadOnlyList<string> gids = ChromarchyBookmarks.Gids;
+        IReadOnlyList<string> gids = ChromaBookmarks.Gids;
         if (gids.Count == 0)
         {
             EditorGUILayout.LabelField("No bookmarks", EditorStyles.miniLabel);
@@ -534,7 +546,7 @@ public class ChromarchyWindow : EditorWindow
         for (int i = 0; i < gids.Count; i++)
         {
             string gid = gids[i];
-            GameObject go = ChromarchyBookmarks.ResolveGid(gid);
+            GameObject go = ChromaBookmarks.ResolveGid(gid);
             string label = go != null ? go.name : "(not in open scene)";
 
             if (hasSearch && label.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0)
@@ -569,9 +581,9 @@ public class ChromarchyWindow : EditorWindow
         if (hasSearch && shown == 0)
             EditorGUILayout.LabelField("No bookmark matches '" + _search + "'", EditorStyles.miniLabel);
 
-        if (jumpTarget != null) ChromarchyBookmarks.Jump(jumpTarget);
-        else if (moveFrom >= 0 && moveTo >= 0) ChromarchyBookmarks.Reorder(moveFrom, moveTo);
-        else if (removeGid != null) ChromarchyBookmarks.Remove(removeGid);
+        if (jumpTarget != null) ChromaBookmarks.Jump(jumpTarget);
+        else if (moveFrom >= 0 && moveTo >= 0) ChromaBookmarks.Reorder(moveFrom, moveTo);
+        else if (removeGid != null) ChromaBookmarks.Remove(removeGid);
     }
 
     #endregion
@@ -619,7 +631,7 @@ public class ChromarchyWindow : EditorWindow
             _so.ApplyModifiedProperties();
             _config.m_version++;
             EditorUtility.SetDirty(_config);
-            ChromarchyHeaders.OnConfigChanged(_config);
+            ChromaHeaders.OnConfigChanged(_config);
         }
 
         DrawFooter();
@@ -737,9 +749,10 @@ public class ChromarchyWindow : EditorWindow
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSpread"), new GUIContent("Hue spread / row"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSaturation"), new GUIContent("Saturation"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbValue"), new GUIContent("Brightness"));
-            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbAlpha"), new GUIContent("Opacity"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbAlpha"), new GUIContent("Opacity (rows)"));
         }
-        EditorGUILayout.LabelField("Animated; tints non-banner rows. Editor-only.", EditorStyles.miniLabel);
+        EditorGUILayout.PropertyField(_so.FindProperty("m_rgbFolders"), new GUIContent("Rainbow folders"));
+        EditorGUILayout.LabelField("Animated. Rows need Rainbow mode; folders use Rainbow folders.", EditorStyles.miniLabel);
     }
 
     private void DrawFolderColors()
@@ -751,7 +764,7 @@ public class ChromarchyWindow : EditorWindow
             _config.m_enableFolderColors = en;
             _config.m_version++;
             EditorUtility.SetDirty(_config);
-            ChromarchyFolders.Invalidate();
+            ChromaFolders.Invalidate();
             EditorApplication.RepaintProjectWindow();
         }
 
@@ -761,7 +774,7 @@ public class ChromarchyWindow : EditorWindow
         using (new EditorGUI.DisabledScope(folders.Count == 0))
             if (GUILayout.Button("Color selected folder(s) (" + folders.Count + ")"))
                 foreach (string guid in folders)
-                    ChromarchyFolders.SetColor(guid, _folderPickColor);
+                    ChromaFolders.SetColor(guid, _folderPickColor);
         EditorGUILayout.EndHorizontal();
 
         var list = _config.m_folderColors;
@@ -773,7 +786,7 @@ public class ChromarchyWindow : EditorWindow
 
         for (int i = 0; i < list.Count; i++)
         {
-            ChromarchyConfig.FolderColor f = list[i];
+            ChromaConfig.FolderColor f = list[i];
             if (f == null) continue;
             string path = AssetDatabase.GUIDToAssetPath(f.m_guid);
             string label = string.IsNullOrEmpty(path) ? "(missing folder)" : Path.GetFileName(path);
@@ -782,10 +795,10 @@ public class ChromarchyWindow : EditorWindow
             EditorGUILayout.LabelField(label);
             Color edited = EditorGUILayout.ColorField(GUIContent.none, f.m_color, false, false, false, GUILayout.Width(50));
             if (edited != f.m_color)
-                ChromarchyFolders.SetColor(f.m_guid, edited);
+                ChromaFolders.SetColor(f.m_guid, edited);
             if (GUILayout.Button("X", GUILayout.Width(22)))
             {
-                ChromarchyFolders.SetColor(f.m_guid, null);
+                ChromaFolders.SetColor(f.m_guid, null);
                 EditorGUILayout.EndHorizontal();
                 break;
             }
@@ -859,18 +872,18 @@ public class ChromarchyWindow : EditorWindow
         _config.m_version++;
         EditorUtility.SetDirty(_config);
         _so.Update();
-        ChromarchyHeaders.OnConfigChanged(_config);
+        ChromaHeaders.OnConfigChanged(_config);
     }
 
-    private static List<ChromarchyConfig.Preset> ThemePresets(string h1, string h2, string h3, string cat, string grad)
+    private static List<ChromaConfig.Preset> ThemePresets(string h1, string h2, string h3, string cat, string grad)
     {
-        return new List<ChromarchyConfig.Preset>
+        return new List<ChromaConfig.Preset>
         {
-            new ChromarchyConfig.Preset { m_key = "h1",   m_spec = h1 + " center bold s12 text:white" },
-            new ChromarchyConfig.Preset { m_key = "h2",   m_spec = h2 + " left bold text:white" },
-            new ChromarchyConfig.Preset { m_key = "h3",   m_spec = h3 + " left italic text:white" },
-            new ChromarchyConfig.Preset { m_key = "cat",  m_spec = cat + " left bold text:white" },
-            new ChromarchyConfig.Preset { m_key = "grad", m_spec = grad + " center bold text:white" },
+            new ChromaConfig.Preset { m_key = "h1",   m_spec = h1 + " center bold s12 text:white" },
+            new ChromaConfig.Preset { m_key = "h2",   m_spec = h2 + " left bold text:white" },
+            new ChromaConfig.Preset { m_key = "h3",   m_spec = h3 + " left italic text:white" },
+            new ChromaConfig.Preset { m_key = "cat",  m_spec = cat + " left bold text:white" },
+            new ChromaConfig.Preset { m_key = "grad", m_spec = grad + " center bold text:white" },
         };
     }
 
@@ -898,7 +911,7 @@ public class ChromarchyWindow : EditorWindow
             spec.stringValue = EditorGUILayout.TextField(spec.stringValue);
 
             Rect swatchRect = GUILayoutUtility.GetRect(22f, 18f, GUILayout.Width(22f));
-            if (ChromarchyHeaders.TryGetPreviewColor(spec.stringValue, out Color preview))
+            if (ChromaHeaders.TryGetPreviewColor(spec.stringValue, out Color preview))
             {
                 EditorGUI.DrawRect(swatchRect, preview);
             }
@@ -943,7 +956,7 @@ public class ChromarchyWindow : EditorWindow
                 _config.m_version++;
                 EditorUtility.SetDirty(_config);
                 _so.Update();
-                ChromarchyHeaders.OnConfigChanged(_config);
+                ChromaHeaders.OnConfigChanged(_config);
             }
         }
         if (GUILayout.Button("Show asset", GUILayout.Height(22)))
@@ -979,7 +992,7 @@ public class ChromarchyWindow : EditorWindow
             _config.m_version++;
             EditorUtility.SetDirty(_config);
             _so.Update();
-            ChromarchyHeaders.OnConfigChanged(_config);
+            ChromaHeaders.OnConfigChanged(_config);
         }
         catch (Exception ex) { EditorUtility.DisplayDialog("Chroma", "Import failed:\n" + ex.Message, "OK"); }
     }
@@ -1076,7 +1089,7 @@ public class ChromarchyWindow : EditorWindow
         "mauve", "white", "black", "cyan", "purple", "pink"
     };
 
-    private ChromarchyConfig _config;
+    private ChromaConfig _config;
     private SerializedObject _so;
     private Vector2 _scroll;
     private Tab _tab;

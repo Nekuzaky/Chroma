@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 // Chroma: color-codes Unity's Hierarchy window. Configured via Tools/Chroma
-// (ChromarchyConfig asset). Optimized rendering: cached styles, Repaint guard,
+// (ChromaConfig asset). Optimized rendering: cached styles, Repaint guard,
 // cached parsing, cached gradient textures.
 //
 // BANNERS: rename a GameObject "<options>=<Title>". Options (space-separated, any order):
@@ -18,9 +18,9 @@ namespace Chromarchy.Editor
 //   No background: "nobg" => text-only label (row masked with the theme color, no colored block)
 // EXTRAS (toggled in the panel): tree guide lines, auto-color rules (Tag/Layer/name-prefix/regex),
 //   child-color inheritance, child count "(N)", zebra striping, animated RGB mode, bookmark stars
-//   (ChromarchyBookmarks), and Project-window folder colors (ChromarchyFolders).
+//   (ChromaBookmarks), and Project-window folder colors (ChromaFolders).
 [InitializeOnLoad]
-public static class ChromarchyHeaders
+public static class ChromaHeaders
 {
     private struct HeaderInfo
     {
@@ -37,7 +37,7 @@ public static class ChromarchyHeaders
         public string m_title;
     }
 
-    #region Publics
+    #region Public
 
 
     #endregion
@@ -45,7 +45,7 @@ public static class ChromarchyHeaders
 
     #region Unity API
 
-    static ChromarchyHeaders()
+    static ChromaHeaders()
     {
         EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
         AssemblyReloadEvents.beforeAssemblyReload += ClearHeaderCache;
@@ -60,20 +60,30 @@ public static class ChromarchyHeaders
     {
         if (Event.current.type != EventType.Repaint) return;
 
+        // InstanceIDToObject is obsolete in Unity 6000.2+ (use EntityIdToObject), but it exists on
+        // every Unity version while EntityIdToObject doesn't — keep it for portability, mute the warning.
+#pragma warning disable 618
         GameObject obj = EditorUtility.InstanceIDToObject(instanceID) as GameObject;
+#pragma warning restore 618
         if (obj == null) return;
 
-        ChromarchyConfig cfg = Config;
+        ChromaConfig cfg = Config;
         EnsureStyles();
 
+        // GameObject.name allocates a string per access; fetch it once and reuse.
+        string goName = obj.name;
+
         // A ChromaBanner component takes precedence over name-based banners and keeps the name clean.
-        bool hasComp = cfg.m_enableHeaders && TryGetComponentInfo(instanceID, obj, out HeaderInfo compInfo);
+        // compInfo is pre-assigned so the short-circuited && (when headers are disabled) can't leave
+        // it unassigned.
+        HeaderInfo compInfo = default;
+        bool hasComp = cfg.m_enableHeaders && TryGetComponentInfo(instanceID, obj, goName, out compInfo);
 
         HeaderInfo info = (!hasComp && (cfg.m_enableSeparators || cfg.m_enableHeaders))
-            ? GetHeaderInfo(obj.name)
+            ? GetHeaderInfo(goName)
             : default;
 
-        bool bookmarked = ChromarchyBookmarks.IsBookmarked(instanceID);
+        bool bookmarked = ChromaBookmarks.IsBookmarked(instanceID);
 
         // Lowest layer: everything else paints over it.
         if (cfg.m_zebra)
@@ -99,7 +109,7 @@ public static class ChromarchyHeaders
             else if (cfg.m_rgbMode)
                 DrawRgbTint(selectionRect, cfg);
             else
-                DrawRowTint(obj, cfg, selectionRect);
+                DrawRowTint(obj, cfg, selectionRect, goName);
         }
 
         // Drawn last so a banner / separator / tint background never hides them.
@@ -115,9 +125,9 @@ public static class ChromarchyHeaders
 
     #region Main API
 
-    // Called by the window after a config edit, and by ChromarchyConfig.OnValidate for
+    // Called by the window after a config edit, and by ChromaConfig.OnValidate for
     // direct Inspector edits.
-    public static void OnConfigChanged(ChromarchyConfig cfg)
+    public static void OnConfigChanged(ChromaConfig cfg)
     {
         _configCache = cfg;
         _presetCache = null;
@@ -129,9 +139,9 @@ public static class ChromarchyHeaders
 
     // Drives the rainbow animation by repainting the Hierarchy on a timer. Subscribed only while
     // RGB mode is on, and throttled to ~30fps so it never spins the editor harder than needed.
-    private static void EnsureRgbPump(ChromarchyConfig cfg)
+    private static void EnsureRgbPump(ChromaConfig cfg)
     {
-        bool want = cfg != null && cfg.m_rgbMode;
+        bool want = cfg != null && (cfg.m_rgbMode || cfg.m_rgbFolders);
         if (want && !_rgbPumping)
         {
             EditorApplication.update += RgbPump;
@@ -149,10 +159,13 @@ public static class ChromarchyHeaders
         double now = EditorApplication.timeSinceStartup;
         if (now - _lastRgbRepaint < 0.033) return;
         _lastRgbRepaint = now;
-        EditorApplication.RepaintHierarchyWindow();
+
+        ChromaConfig cfg = Config;
+        if (cfg == null || cfg.m_rgbMode) EditorApplication.RepaintHierarchyWindow();
+        if (cfg != null && cfg.m_rgbFolders) EditorApplication.RepaintProjectWindow();
     }
 
-    private static void DrawRgbTint(Rect rect, ChromarchyConfig cfg)
+    private static void DrawRgbTint(Rect rect, ChromaConfig cfg)
     {
         float hue = Mathf.Repeat(
             (float)(EditorApplication.timeSinceStartup * cfg.m_rgbSpeed) + rect.y * cfg.m_rgbSpread, 1f);
@@ -161,12 +174,12 @@ public static class ChromarchyHeaders
         EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), c);
     }
 
-    private static void InvalidateAutoColorCache(ChromarchyConfig cfg)
+    private static void InvalidateAutoColorCache(ChromaConfig cfg)
     {
         if (cfg == null || cfg.m_autoColorRules == null) return;
         for (int i = 0; i < cfg.m_autoColorRules.Count; i++)
         {
-            ChromarchyConfig.AutoColorRule r = cfg.m_autoColorRules[i];
+            ChromaConfig.AutoColorRule r = cfg.m_autoColorRules[i];
             if (r == null) continue;
             r.m_cachedLayerFor = null;
             r.m_cachedRegexFor = null;
@@ -325,8 +338,8 @@ public static class ChromarchyHeaders
         return e.m_valid;
     }
 
-    // Used by ChromarchyBuildStripper to drop banner/separator specs from names in built scenes.
-    // Returns true when `name` is a recognized Chromarchy header or separator, and writes the
+    // Used by ChromaBuildStripper to drop banner/separator specs from names in built scenes.
+    // Returns true when `name` is a recognized Chroma header or separator, and writes the
     // cleaned title/caption into `cleaned`. The bypassing of GetHeaderInfo is intentional:
     // we don't want build-time names to pollute the editor's render cache.
     internal static bool TryStripName(string name, out string cleaned)
@@ -360,7 +373,7 @@ public static class ChromarchyHeaders
     #endregion
 
 
-    #region Tools and Utilies
+    #region Tools and Utilities
 
     private static void ClearHeaderCache()
     {
@@ -387,13 +400,13 @@ public static class ChromarchyHeaders
     // Cached per-object lookup of the ChromaBanner component. The cache stores a sentinel
     // (m_isHeader == false) for objects without a banner, so GetComponent runs only on a miss.
     // Invalidated on hierarchyChanged and ChromaBanner.Changed (add / edit / remove).
-    private static bool TryGetComponentInfo(int instanceID, GameObject obj, out HeaderInfo info)
+    private static bool TryGetComponentInfo(int instanceID, GameObject obj, string objName, out HeaderInfo info)
     {
         if (_compCache.TryGetValue(instanceID, out info))
             return info.m_isHeader;
 
         ChromaBanner b = obj.GetComponent<ChromaBanner>();
-        info = (b != null && b.enabled) ? BuildInfoFromComponent(b, obj.name) : default;
+        info = (b != null && b.enabled) ? BuildInfoFromComponent(b, objName) : default;
         _compCache[instanceID] = info;
         return info.m_isHeader;
     }
@@ -438,20 +451,20 @@ public static class ChromarchyHeaders
         }
     }
 
-    private static ChromarchyConfig Config
+    private static ChromaConfig Config
     {
         get
         {
             if (_configCache != null) return _configCache;
 
-            string[] guids = AssetDatabase.FindAssets("t:ChromarchyConfig");
+            string[] guids = AssetDatabase.FindAssets("t:ChromaConfig");
             if (guids.Length > 0)
-                _configCache = AssetDatabase.LoadAssetAtPath<ChromarchyConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                _configCache = AssetDatabase.LoadAssetAtPath<ChromaConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
 
             if (_configCache == null)
             {
                 // No asset yet: in-memory defaults (not saved to disk).
-                _configCache = ScriptableObject.CreateInstance<ChromarchyConfig>();
+                _configCache = ScriptableObject.CreateInstance<ChromaConfig>();
                 _configCache.ResetToDefaults();
             }
             return _configCache;
@@ -477,6 +490,7 @@ public static class ChromarchyHeaders
         _headerStyle = new GUIStyle(EditorStyles.boldLabel);
         _sepStyle = new GUIStyle(EditorStyles.boldLabel) { alignment = TextAnchor.MiddleCenter, fontSize = 10 };
         _countStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight, fontSize = 9 };
+        _countStyle.normal.textColor = new Color(1f, 1f, 1f, 0.4f); // set once, not per row
         _sepContent = new GUIContent();
         _starContent = EditorGUIUtility.IconContent("Favorite Icon");
         // Approximate Hierarchy row background, used to mask the native name on text-only ("nobg") banners.
@@ -506,10 +520,10 @@ public static class ChromarchyHeaders
         EditorGUI.LabelField(labelRect, info.m_title, _headerStyle);
     }
 
-    private static void DrawRowTint(GameObject obj, ChromarchyConfig cfg, Rect rect)
+    private static void DrawRowTint(GameObject obj, ChromaConfig cfg, Rect rect, string objName)
     {
         Color tint;
-        bool hasTint = TryGetAutoColor(obj, cfg, out tint)
+        bool hasTint = TryGetAutoColor(obj, cfg, objName, out tint)
                        || (cfg.m_enableChildInherit && TryGetInheritedTint(obj, cfg, out tint));
 
         if (hasTint)
@@ -520,7 +534,7 @@ public static class ChromarchyHeaders
     }
 
     // First enabled rule whose Tag / Layer / name-prefix matches the object.
-    private static bool TryGetAutoColor(GameObject obj, ChromarchyConfig cfg, out Color color)
+    private static bool TryGetAutoColor(GameObject obj, ChromaConfig cfg, string objName, out Color color)
     {
         color = default;
         var rules = cfg.m_autoColorRules;
@@ -528,7 +542,7 @@ public static class ChromarchyHeaders
 
         for (int i = 0; i < rules.Count; i++)
         {
-            ChromarchyConfig.AutoColorRule r = rules[i];
+            ChromaConfig.AutoColorRule r = rules[i];
             if (r == null || !r.m_enabled || string.IsNullOrEmpty(r.m_value)) continue;
 
             bool match = false;
@@ -547,10 +561,10 @@ public static class ChromarchyHeaders
                     match = r.m_cachedLayer >= 0 && obj.layer == r.m_cachedLayer;
                     break;
                 case AutoColorMatch.NamePrefix:
-                    match = obj.name.StartsWith(r.m_value, StringComparison.Ordinal);
+                    match = objName.StartsWith(r.m_value, StringComparison.Ordinal);
                     break;
                 case AutoColorMatch.Regex:
-                    match = MatchRegex(r, obj.name);
+                    match = MatchRegex(r, objName);
                     break;
             }
             if (match) { color = r.m_color; return true; }
@@ -561,7 +575,7 @@ public static class ChromarchyHeaders
     // Compiles and caches the rule's regex once per pattern change. A pattern that fails to
     // compile is cached as a null regex (with the marker set) so we never retry — and never
     // match — until the user edits it.
-    private static bool MatchRegex(ChromarchyConfig.AutoColorRule r, string name)
+    private static bool MatchRegex(ChromaConfig.AutoColorRule r, string name)
     {
         if (r.m_cachedRegexFor != r.m_value)
         {
@@ -580,7 +594,7 @@ public static class ChromarchyHeaders
 
     // Walks up to the nearest banner ancestor and returns its color at a reduced opacity
     // (constant for Flat, fading per depth for DepthFade).
-    private static bool TryGetInheritedTint(GameObject obj, ChromarchyConfig cfg, out Color tint)
+    private static bool TryGetInheritedTint(GameObject obj, ChromaConfig cfg, out Color tint)
     {
         tint = default;
         Transform t = obj.transform.parent;
@@ -591,9 +605,10 @@ public static class ChromarchyHeaders
             // Consider a component banner first, then a name-based one. Skip "no background"
             // banners — there's no color to inherit.
             GameObject go = t.gameObject;
-            HeaderInfo info = TryGetComponentInfo(go.GetInstanceID(), go, out HeaderInfo ci)
+            string goName = go.name;
+            HeaderInfo info = TryGetComponentInfo(go.GetInstanceID(), go, goName, out HeaderInfo ci)
                 ? ci
-                : GetHeaderInfo(go.name);
+                : GetHeaderInfo(goName);
 
             if (info.m_isHeader && !info.m_noBackground)
             {
@@ -612,7 +627,7 @@ public static class ChromarchyHeaders
     }
 
     // File-explorer style connector lines, drawn in the indent gutter (x < selectionRect.x).
-    private static void DrawTreeLines(GameObject obj, Rect rect, ChromarchyConfig cfg)
+    private static void DrawTreeLines(GameObject obj, Rect rect, ChromaConfig cfg)
     {
         Transform t = obj.transform;
         if (t.parent == null) return;
@@ -643,7 +658,7 @@ public static class ChromarchyHeaders
 
     // Faint alternating row background. Parity is derived from the row's Y so it stays cheap and
     // stateless; it flips when scrolling by an odd number of rows, which is the expected behavior.
-    private static void DrawZebra(Rect rect, ChromarchyConfig cfg)
+    private static void DrawZebra(Rect rect, ChromaConfig cfg)
     {
         int row = Mathf.FloorToInt(rect.y / Mathf.Max(1f, rect.height));
         if ((row & 1) == 0) return;
@@ -658,8 +673,15 @@ public static class ChromarchyHeaders
 
         float rightPad = bookmarked ? 18f : 2f;
         Rect countRect = new Rect(rect.x, rect.y, rect.width - rightPad, rect.height);
-        _countStyle.normal.textColor = new Color(1f, 1f, 1f, 0.4f);
-        GUI.Label(countRect, "(" + n + ")", _countStyle);
+        GUI.Label(countRect, CountLabel(n), _countStyle);
+    }
+
+    // Cached "(N)" labels so the common counts don't reallocate a string every repaint.
+    private static string CountLabel(int n)
+    {
+        if (n >= 0 && n < _countLabels.Length)
+            return _countLabels[n] ?? (_countLabels[n] = "(" + n + ")");
+        return "(" + n + ")"; // very large counts: rare, accept the alloc
     }
 
     private static void DrawBookmark(Rect rect)
@@ -672,7 +694,7 @@ public static class ChromarchyHeaders
     }
 
     // Thin full-width divider (optional centered caption) that replaces the native "---..." label.
-    private static void DrawSeparator(HeaderInfo info, Rect rect, ChromarchyConfig cfg)
+    private static void DrawSeparator(HeaderInfo info, Rect rect, ChromaConfig cfg)
     {
         // Paint over the row to hide the native "---..." text.
         EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), cfg.m_separatorFillColor);
@@ -926,7 +948,7 @@ public static class ChromarchyHeaders
     private static readonly Dictionary<string, HeaderInfo> _headerCache = new Dictionary<string, HeaderInfo>();
     private static readonly Dictionary<int, HeaderInfo> _compCache = new Dictionary<int, HeaderInfo>();
     private static Dictionary<string, string> _presetCache;
-    private static ChromarchyConfig _configCache;
+    private static ChromaConfig _configCache;
 
     private static GUIStyle _headerStyle;
     private static GUIStyle _sepStyle;
@@ -935,6 +957,7 @@ public static class ChromarchyHeaders
     private static GUIContent _starContent;
     private static Color _rowMaskColor;
     private static bool _stylesReady;
+    private static readonly string[] _countLabels = new string[64]; // cached "(N)" child-count labels
 
     private static bool _rgbPumping;
     private static double _lastRgbRepaint;

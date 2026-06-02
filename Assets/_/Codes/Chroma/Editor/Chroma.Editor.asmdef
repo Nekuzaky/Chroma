@@ -1,5 +1,5 @@
 {
-    "name": "Chromarchy.Editor",
+    "name": "Chroma.Editor",
     "references": [
         "Chroma.Runtime"
     ],

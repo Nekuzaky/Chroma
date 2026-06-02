@@ -2,15 +2,15 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 public enum ChildInheritMode { Flat, DepthFade }
 public enum AutoColorMatch { Tag, Layer, NamePrefix, Regex }
 public enum SeparatorStyle { Solid, Dashed, Dotted, Double }
 
-// Persisted config (project asset, shareable via git) for ChromarchyHeaders.
-// Edited through the Tools/Chromarchy window.
-public class ChromarchyConfig : ScriptableObject
+// Persisted config (project asset, shareable via git) for ChromaHeaders.
+// Edited through the Tools/Chroma window.
+public class ChromaConfig : ScriptableObject
 {
     [System.Serializable]
     public class Preset
@@ -44,7 +44,7 @@ public class ChromarchyConfig : ScriptableObject
         [System.NonSerialized] internal string m_cachedRegexFor;
     }
 
-    #region Publics
+    #region Public
 
     [Header("Display")]
     public bool m_enableHeaders = true;
@@ -93,6 +93,8 @@ public class ChromarchyConfig : ScriptableObject
     [Range(0.02f, 0.8f)] public float m_rgbAlpha = 0.30f;
     [Tooltip("Hue spread across rows. 0 = every row shares the same hue.")]
     [Range(0f, 0.02f)] public float m_rgbSpread = 0.004f;
+    [Tooltip("Also animate Project-window folder icons through the rainbow.")]
+    public bool m_rgbFolders = false;
 
     public List<Preset> m_presets = new List<Preset>();
 
@@ -107,7 +109,7 @@ public class ChromarchyConfig : ScriptableObject
     private void OnValidate()
     {
         // Catches direct Inspector edits (the window already calls OnConfigChanged explicitly).
-        ChromarchyHeaders.OnConfigChanged(this);
+        ChromaHeaders.OnConfigChanged(this);
     }
 
     #endregion
@@ -152,6 +154,7 @@ public class ChromarchyConfig : ScriptableObject
         m_rgbValue = 0.9f;
         m_rgbAlpha = 0.30f;
         m_rgbSpread = 0.004f;
+        m_rgbFolders = false;
 
         m_presets = new List<Preset>
         {
@@ -163,29 +166,29 @@ public class ChromarchyConfig : ScriptableObject
         };
     }
 
-    public static ChromarchyConfig GetOrCreate()
+    public static ChromaConfig GetOrCreate()
     {
-        string[] guids = AssetDatabase.FindAssets("t:ChromarchyConfig");
+        string[] guids = AssetDatabase.FindAssets("t:ChromaConfig");
         if (guids.Length > 0)
         {
-            var existing = AssetDatabase.LoadAssetAtPath<ChromarchyConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
+            var existing = AssetDatabase.LoadAssetAtPath<ChromaConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
             if (existing != null) return existing;
         }
 
-        var cfg = CreateInstance<ChromarchyConfig>();
+        var cfg = CreateInstance<ChromaConfig>();
         cfg.ResetToDefaults();
 
         string dir = FindAssetFolder();
-        AssetDatabase.CreateAsset(cfg, dir + "/ChromarchyConfig.asset");
+        AssetDatabase.CreateAsset(cfg, dir + "/ChromaConfig.asset");
         AssetDatabase.SaveAssets();
         return cfg;
     }
 
-    // Place the asset next to the Chromarchy scripts if they live under Assets/; otherwise
-    // fall back to Assets/Editor/Chromarchy/ (Packages/ is read-only and can't host assets).
+    // Place the asset next to the Chroma scripts if they live under Assets/; otherwise
+    // fall back to Assets/Editor/Chroma/ (Packages/ is read-only and can't host assets).
     private static string FindAssetFolder()
     {
-        string[] scriptGuids = AssetDatabase.FindAssets("ChromarchyHeaders t:Script");
+        string[] scriptGuids = AssetDatabase.FindAssets("ChromaHeaders t:Script");
         for (int i = 0; i < scriptGuids.Length; i++)
         {
             string p = AssetDatabase.GUIDToAssetPath(scriptGuids[i]);
@@ -197,15 +200,15 @@ public class ChromarchyConfig : ScriptableObject
 
         if (!AssetDatabase.IsValidFolder("Assets/Editor"))
             AssetDatabase.CreateFolder("Assets", "Editor");
-        if (!AssetDatabase.IsValidFolder("Assets/Editor/Chromarchy"))
-            AssetDatabase.CreateFolder("Assets/Editor", "Chromarchy");
-        return "Assets/Editor/Chromarchy";
+        if (!AssetDatabase.IsValidFolder("Assets/Editor/Chroma"))
+            AssetDatabase.CreateFolder("Assets/Editor", "Chroma");
+        return "Assets/Editor/Chroma";
     }
 
     #endregion
 
 
-    #region Tools and Utilies
+    #region Tools and Utilities
 
 
     #endregion

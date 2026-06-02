@@ -3,27 +3,35 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 // Per-user, scene-aware bookmarks for the Hierarchy. Stored in EditorPrefs as GlobalObjectId
 // strings (NOT in the shared config asset). A cached instanceID set gives O(1) per-row checks.
 [InitializeOnLoad]
-public static class ChromarchyBookmarks
+public static class ChromaBookmarks
 {
-    #region Publics
+    #region Public
 
     public static IReadOnlyList<string> Gids => _gids;
 
     #endregion
 
 
+    #region Private and Protected
+
+    private static readonly List<string> _gids = new List<string>();
+    private static readonly HashSet<int> _ids = new HashSet<int>();
+
+    #endregion
+
+
     #region Unity API
 
-    static ChromarchyBookmarks()
+    static ChromaBookmarks()
     {
         EditorApplication.hierarchyChanged += RebuildIdCache;
         // Defer the load: AssetDatabase isn't always ready inside [InitializeOnLoad] static ctors,
-        // and the bookmark key depends on the ChromarchyConfig asset's GUID.
+        // and the bookmark key depends on the ChromaConfig asset's GUID.
         EditorApplication.delayCall += Load;
     }
 
@@ -45,7 +53,7 @@ public static class ChromarchyBookmarks
         if (go == null) return;
         // Ensures the config asset exists so the bookmark key (based on its GUID) is stable
         // before the first write.
-        ChromarchyConfig.GetOrCreate();
+        ChromaConfig.GetOrCreate();
         string gid = GlobalObjectId.GetGlobalObjectIdSlow(go).ToString();
         if (_gids.Contains(gid)) return;
         _gids.Add(gid);
@@ -57,7 +65,7 @@ public static class ChromarchyBookmarks
     public static void Toggle(GameObject go)
     {
         if (go == null) return;
-        ChromarchyConfig.GetOrCreate();
+        ChromaConfig.GetOrCreate();
         string gid = GlobalObjectId.GetGlobalObjectIdSlow(go).ToString();
         bool removed = _gids.Remove(gid);
         if (!removed) _gids.Add(gid);
@@ -108,22 +116,22 @@ public static class ChromarchyBookmarks
     #endregion
 
 
-    #region Tools and Utilies
+    #region Tools and Utilities
 
-    // Keyed by the ChromarchyConfig asset's GUID (stable across project moves / renames).
+    // Keyed by the ChromaConfig asset's GUID (stable across project moves / renames).
     // Falls back to "default" when the asset doesn't exist yet; Add() materializes the asset
     // before the first write, so we never persist under "default" in practice.
     private static string Key
     {
         get
         {
-            string[] guids = AssetDatabase.FindAssets("t:ChromarchyConfig");
-            if (guids.Length > 0) return "Chromarchy.Bookmarks:" + guids[0];
-            return "Chromarchy.Bookmarks:default";
+            string[] guids = AssetDatabase.FindAssets("t:ChromaConfig");
+            if (guids.Length > 0) return "Chroma.Bookmarks:" + guids[0];
+            return "Chroma.Bookmarks:default";
         }
     }
 
-    private static string LegacyKey => "Chromarchy.Bookmarks:" + Application.dataPath;
+    private static string LegacyKey => "Chroma.Bookmarks:" + Application.dataPath;
 
     private static void Load()
     {
@@ -163,14 +171,6 @@ public static class ChromarchyBookmarks
             if (go != null) _ids.Add(go.GetInstanceID());
         }
     }
-
-    #endregion
-
-
-    #region Private and Protected
-
-    private static readonly List<string> _gids = new List<string>();
-    private static readonly HashSet<int> _ids = new HashSet<int>();
 
     #endregion
 }

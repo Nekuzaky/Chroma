@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 550ec41fe696ad64ea943eebdcdf45e5, type: 3}
-  m_Name: ChromarchyConfig
-  m_EditorClassIdentifier: Chromarchy.Editor::Chromarchy.Editor.ChromarchyConfig
+  m_Name: ChromaConfig
+  m_EditorClassIdentifier: Chroma.Editor::Chroma.Editor.ChromaConfig
   m_enableHeaders: 1
   m_enableTreeLines: 1
   m_treeLineColor: {r: 0.4, g: 0.7, b: 1, a: 0.25}

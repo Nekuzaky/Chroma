@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Chromarchy
+namespace Chroma
 {
 public enum ChromaAlign { Center, Left, Right }
 public enum ChromaFontStyle { Bold, Normal, Italic, BoldItalic }
@@ -14,6 +14,8 @@ public enum ChromaFontStyle { Bold, Normal, Italic, BoldItalic }
 [AddComponentMenu("Chroma/Chroma Banner")]
 public class ChromaBanner : MonoBehaviour
 {
+    #region Public
+
     [Header("Background")]
     public bool m_background = true;
     public Color m_color = new Color(0.15f, 0.45f, 0.90f);
@@ -21,24 +23,32 @@ public class ChromaBanner : MonoBehaviour
     public Color m_color2 = new Color(0.48f, 0.18f, 0.91f);
     public bool m_vertical = false;
 
-    [Header("Font")]
+    [Space(150), Header("Font")]
     public Color m_textColor = Color.white;
     public ChromaAlign m_align = ChromaAlign.Center;
     public ChromaFontStyle m_fontStyle = ChromaFontStyle.Bold;
     public int m_fontSize = 0;
 
-    [Header("Title")]
+    [Space(150), Header("Title")]
     [Tooltip("Empty = use the GameObject's name.")]
     public string m_title = "";
+
+    #endregion
+
+
+    #region Unity API
 
 #if UNITY_EDITOR
     // Lets the Hierarchy drawer refresh its cache when this component is added, edited, or removed.
     // Editor-only: these callbacks compile out of player builds entirely.
     public static event Action Changed;
-    private void OnValidate() { Changed?.Invoke(); }
-    private void OnEnable() { Changed?.Invoke(); }
-    private void OnDisable() { Changed?.Invoke(); }
-    private void OnDestroy() { Changed?.Invoke(); }
+
+    private void OnValidate() => Changed?.Invoke();
+    private void OnEnable() => Changed?.Invoke();
+    private void OnDisable() => Changed?.Invoke();
+    private void OnDestroy() => Changed?.Invoke();
 #endif
+
+    #endregion
 }
 }

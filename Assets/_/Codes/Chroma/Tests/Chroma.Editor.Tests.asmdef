@@ -1,8 +1,8 @@
 {
-    "name": "Chromarchy.Editor.Tests",
-    "rootNamespace": "Chromarchy.Editor.Tests",
+    "name": "Chroma.Editor.Tests",
+    "rootNamespace": "Chroma.Editor.Tests",
     "references": [
-        "Chromarchy.Editor",
+        "Chroma.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

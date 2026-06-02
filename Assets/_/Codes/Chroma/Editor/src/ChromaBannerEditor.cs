@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 // Grouped Inspector for ChromaBanner: Background (toggle gates the colors), Font, Title.
 // Edits flow through OnValidate -> ChromaBanner.Changed, so the Hierarchy refreshes live.
@@ -9,6 +9,8 @@ namespace Chromarchy.Editor
 [CanEditMultipleObjects]
 public class ChromaBannerEditor : UnityEditor.Editor
 {
+    #region Unity API
+
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
@@ -46,5 +48,7 @@ public class ChromaBannerEditor : UnityEditor.Editor
 
         serializedObject.ApplyModifiedProperties();
     }
+
+    #endregion
 }
 }

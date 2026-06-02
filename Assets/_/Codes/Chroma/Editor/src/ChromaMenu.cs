@@ -2,31 +2,32 @@ using UnityEditor;
 using UnityEditor.ShortcutManagement;
 using UnityEngine;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
 // Context-menu entries (right-click in Hierarchy) and keyboard shortcuts.
 // All entries operate on the current Selection; shortcuts are bindable in Edit > Shortcuts.
-public static class ChromarchyMenu
+public static class ChromaMenu
 {
+    #region Private and Protected
+
+    private static string _copiedSpec;
+
+    #endregion
+
+
     #region Main API
 
     [MenuItem("GameObject/Chroma/Toggle Bookmark", true)]
     private static bool ValidateHasSelection() => Selection.activeGameObject != null;
 
     [MenuItem("GameObject/Chroma/Toggle Bookmark", false, 200)]
-    private static void MenuToggleBookmark()
-    {
-        ToggleBookmarkOnSelection();
-    }
+    private static void MenuToggleBookmark() => ToggleBookmarkOnSelection();
 
     [MenuItem("GameObject/Chroma/Strip Banner", true)]
     private static bool ValidateStrip() => Selection.activeGameObject != null;
 
     [MenuItem("GameObject/Chroma/Strip Banner", false, 201)]
-    private static void MenuStripBanner()
-    {
-        StripBannerOnSelection();
-    }
+    private static void MenuStripBanner() => StripBannerOnSelection();
 
     [MenuItem("GameObject/Chroma/Copy Banner Style", true)]
     private static bool ValidateCopyStyle()
@@ -63,10 +64,7 @@ public static class ChromarchyMenu
     }
 
     [MenuItem("GameObject/Chroma/Open Window", false, 230)]
-    private static void MenuOpenWindow()
-    {
-        OpenWindow();
-    }
+    private static void MenuOpenWindow() => OpenWindow();
 
     // --- Project window: folder colors ---
 
@@ -97,29 +95,23 @@ public static class ChromarchyMenu
     private static void FolderClear() => SetFolderColor(null);
 
     [Shortcut("Chroma/Toggle Bookmark on Selection", KeyCode.B, ShortcutModifiers.Action)]
-    private static void ShortcutToggleBookmark()
-    {
-        ToggleBookmarkOnSelection();
-    }
+    private static void ShortcutToggleBookmark() => ToggleBookmarkOnSelection();
 
     // Bindable but unassigned by default — the user picks a key in Edit > Shortcuts.
     [Shortcut("Chroma/Open Window")]
-    private static void ShortcutOpenWindow()
-    {
-        OpenWindow();
-    }
+    private static void ShortcutOpenWindow() => OpenWindow();
 
     #endregion
 
 
-    #region Tools and Utilies
+    #region Tools and Utilities
 
     private static void ToggleBookmarkOnSelection()
     {
         GameObject[] sel = Selection.gameObjects;
         if (sel == null) return;
         for (int i = 0; i < sel.Length; i++)
-            ChromarchyBookmarks.Toggle(sel[i]);
+            ChromaBookmarks.Toggle(sel[i]);
     }
 
     private static void StripBannerOnSelection()
@@ -130,7 +122,7 @@ public static class ChromarchyMenu
         {
             GameObject go = sel[i];
             if (go == null) continue;
-            if (!ChromarchyHeaders.TryStripName(go.name, out string cleaned)) continue;
+            if (!ChromaHeaders.TryStripName(go.name, out string cleaned)) continue;
             if (string.IsNullOrWhiteSpace(cleaned) || cleaned == go.name) continue;
             Undo.RecordObject(go, "Chroma: strip banner");
             go.name = cleaned;
@@ -139,10 +131,7 @@ public static class ChromarchyMenu
         EditorApplication.RepaintHierarchyWindow();
     }
 
-    private static void OpenWindow()
-    {
-        EditorWindow.GetWindow<ChromarchyWindow>("Chroma");
-    }
+    private static void OpenWindow() => EditorWindow.GetWindow<ChromaWindow>("Chroma");
 
     private static System.Collections.Generic.List<string> GetSelectedFolderGuids()
     {
@@ -159,15 +148,8 @@ public static class ChromarchyMenu
     private static void SetFolderColor(Color? color)
     {
         foreach (string guid in GetSelectedFolderGuids())
-            ChromarchyFolders.SetColor(guid, color);
+            ChromaFolders.SetColor(guid, color);
     }
-
-    #endregion
-
-
-    #region Private and Protected
-
-    private static string _copiedSpec;
 
     #endregion
 }

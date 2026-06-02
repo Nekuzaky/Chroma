@@ -1,6 +1,6 @@
 {
     "name": "Chroma.Runtime",
-    "rootNamespace": "Chromarchy",
+    "rootNamespace": "Chroma",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

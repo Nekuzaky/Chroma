@@ -4,14 +4,14 @@ using UnityEditor.Build.Reporting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Chromarchy.Editor
+namespace Chroma.Editor
 {
-// Strips Chromarchy banner specs from GameObject names in scenes during a player build.
+// Strips Chroma banner specs from GameObject names in scenes during a player build.
 // Modifies only the in-memory scene that Unity bakes into the player; the .unity asset on
-// disk is left untouched. Gated by ChromarchyConfig.m_stripNamesInBuild (default true).
-public class ChromarchyBuildStripper : IProcessSceneWithReport
+// disk is left untouched. Gated by ChromaConfig.m_stripNamesInBuild (default true).
+public class ChromaBuildStripper : IProcessSceneWithReport
 {
-    #region Publics
+    #region Public
 
     public int callbackOrder => 0;
 
@@ -52,13 +52,13 @@ public class ChromarchyBuildStripper : IProcessSceneWithReport
     #endregion
 
 
-    #region Tools and Utilies
+    #region Tools and Utilities
 
     private static int StripRecursive(Transform t)
     {
         int count = 0;
 
-        if (ChromarchyHeaders.TryStripName(t.name, out string cleaned)
+        if (ChromaHeaders.TryStripName(t.name, out string cleaned)
             && !string.IsNullOrWhiteSpace(cleaned)
             && cleaned != t.name)
         {
@@ -75,9 +75,9 @@ public class ChromarchyBuildStripper : IProcessSceneWithReport
 
     private static bool ShouldStrip()
     {
-        string[] guids = AssetDatabase.FindAssets("t:ChromarchyConfig");
+        string[] guids = AssetDatabase.FindAssets("t:ChromaConfig");
         if (guids.Length == 0) return true; // no config asset => assume default behavior
-        var cfg = AssetDatabase.LoadAssetAtPath<ChromarchyConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
+        var cfg = AssetDatabase.LoadAssetAtPath<ChromaConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
         return cfg == null || cfg.m_stripNamesInBuild;
     }
 
