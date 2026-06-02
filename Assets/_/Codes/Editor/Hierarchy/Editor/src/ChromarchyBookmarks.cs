@@ -21,8 +21,10 @@ public static class ChromarchyBookmarks
 
     static ChromarchyBookmarks()
     {
-        Load();
         EditorApplication.hierarchyChanged += RebuildIdCache;
+        // Defer the load: AssetDatabase isn't always ready inside [InitializeOnLoad] static ctors,
+        // and the bookmark key depends on the ChromarchyConfig asset's GUID.
+        EditorApplication.delayCall += Load;
     }
 
     #endregion
@@ -32,12 +34,33 @@ public static class ChromarchyBookmarks
 
     public static bool IsBookmarked(int instanceID) => _ids.Contains(instanceID);
 
+    public static bool IsBookmarked(GameObject go)
+    {
+        if (go == null) return false;
+        return _gids.Contains(GlobalObjectId.GetGlobalObjectIdSlow(go).ToString());
+    }
+
     public static void Add(GameObject go)
     {
         if (go == null) return;
+        // Ensures the config asset exists so the bookmark key (based on its GUID) is stable
+        // before the first write.
+        ChromarchyConfig.GetOrCreate();
         string gid = GlobalObjectId.GetGlobalObjectIdSlow(go).ToString();
         if (_gids.Contains(gid)) return;
         _gids.Add(gid);
+        Save();
+        RebuildIdCache();
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    public static void Toggle(GameObject go)
+    {
+        if (go == null) return;
+        ChromarchyConfig.GetOrCreate();
+        string gid = GlobalObjectId.GetGlobalObjectIdSlow(go).ToString();
+        bool removed = _gids.Remove(gid);
+        if (!removed) _gids.Add(gid);
         Save();
         RebuildIdCache();
         EditorApplication.RepaintHierarchyWindow();
@@ -51,6 +74,19 @@ public static class ChromarchyBookmarks
             RebuildIdCache();
             EditorApplication.RepaintHierarchyWindow();
         }
+    }
+
+    public static void Reorder(int from, int to)
+    {
+        if (from < 0 || from >= _gids.Count) return;
+        if (to < 0) to = 0;
+        if (to >= _gids.Count) to = _gids.Count - 1;
+        if (from == to) return;
+        string g = _gids[from];
+        _gids.RemoveAt(from);
+        _gids.Insert(to, g);
+        Save();
+        EditorApplication.RepaintHierarchyWindow();
     }
 
     public static GameObject ResolveGid(string gid)
@@ -74,15 +110,43 @@ public static class ChromarchyBookmarks
 
     #region Tools and Utilies
 
-    private static string Key => "Chromarchy.Bookmarks:" + Application.dataPath;
+    // Keyed by the ChromarchyConfig asset's GUID (stable across project moves / renames).
+    // Falls back to "default" when the asset doesn't exist yet; Add() materializes the asset
+    // before the first write, so we never persist under "default" in practice.
+    private static string Key
+    {
+        get
+        {
+            string[] guids = AssetDatabase.FindAssets("t:ChromarchyConfig");
+            if (guids.Length > 0) return "Chromarchy.Bookmarks:" + guids[0];
+            return "Chromarchy.Bookmarks:default";
+        }
+    }
+
+    private static string LegacyKey => "Chromarchy.Bookmarks:" + Application.dataPath;
 
     private static void Load()
     {
         _gids.Clear();
-        string raw = EditorPrefs.GetString(Key, "");
+        string key = Key;
+        string raw = EditorPrefs.GetString(key, "");
+
+        // One-shot migration from the old dataPath-based key.
+        if (string.IsNullOrEmpty(raw))
+        {
+            string legacyRaw = EditorPrefs.GetString(LegacyKey, "");
+            if (!string.IsNullOrEmpty(legacyRaw) && key != LegacyKey)
+            {
+                raw = legacyRaw;
+                EditorPrefs.SetString(key, raw);
+                EditorPrefs.DeleteKey(LegacyKey);
+            }
+        }
+
         if (!string.IsNullOrEmpty(raw))
             _gids.AddRange(raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
         RebuildIdCache();
+        EditorApplication.RepaintHierarchyWindow();
     }
 
     private static void Save()

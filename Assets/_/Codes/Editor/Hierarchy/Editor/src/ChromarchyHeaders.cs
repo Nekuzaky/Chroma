@@ -46,6 +46,8 @@ public static class ChromarchyHeaders
     {
         EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
         AssemblyReloadEvents.beforeAssemblyReload += ClearHeaderCache;
+        // Config may not be loadable yet inside the static ctor; defer the RGB pump check.
+        EditorApplication.delayCall += () => EnsureRgbPump(Config);
     }
 
     private static void OnHierarchyGUI(int instanceID, Rect selectionRect)
@@ -75,6 +77,8 @@ public static class ChromarchyHeaders
 
             if (cfg.m_enableHeaders && info.m_isHeader)
                 DrawHeader(info, selectionRect);
+            else if (cfg.m_rgbMode)
+                DrawRgbTint(selectionRect, cfg);
             else
                 DrawRowTint(obj, cfg, selectionRect);
         }
@@ -89,13 +93,240 @@ public static class ChromarchyHeaders
 
     #region Main API
 
-    // Called by the window after a config edit.
+    // Called by the window after a config edit, and by ChromarchyConfig.OnValidate for
+    // direct Inspector edits.
     public static void OnConfigChanged(ChromarchyConfig cfg)
     {
         _configCache = cfg;
         _presetCache = null;
         ClearHeaderCache();
+        InvalidateAutoColorCache(cfg);
+        EnsureRgbPump(cfg);
         EditorApplication.RepaintHierarchyWindow();
+    }
+
+    // Drives the rainbow animation by repainting the Hierarchy on a timer. Subscribed only while
+    // RGB mode is on, and throttled to ~30fps so it never spins the editor harder than needed.
+    private static void EnsureRgbPump(ChromarchyConfig cfg)
+    {
+        bool want = cfg != null && cfg.m_rgbMode;
+        if (want && !_rgbPumping)
+        {
+            EditorApplication.update += RgbPump;
+            _rgbPumping = true;
+        }
+        else if (!want && _rgbPumping)
+        {
+            EditorApplication.update -= RgbPump;
+            _rgbPumping = false;
+        }
+    }
+
+    private static void RgbPump()
+    {
+        double now = EditorApplication.timeSinceStartup;
+        if (now - _lastRgbRepaint < 0.033) return;
+        _lastRgbRepaint = now;
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    private static void DrawRgbTint(Rect rect, ChromarchyConfig cfg)
+    {
+        float hue = Mathf.Repeat(
+            (float)(EditorApplication.timeSinceStartup * cfg.m_rgbSpeed) + rect.y * cfg.m_rgbSpread, 1f);
+        Color c = Color.HSVToRGB(hue, cfg.m_rgbSaturation, cfg.m_rgbValue);
+        c.a = cfg.m_rgbAlpha;
+        EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), c);
+    }
+
+    private static void InvalidateAutoColorCache(ChromarchyConfig cfg)
+    {
+        if (cfg == null || cfg.m_autoColorRules == null) return;
+        for (int i = 0; i < cfg.m_autoColorRules.Count; i++)
+        {
+            ChromarchyConfig.AutoColorRule r = cfg.m_autoColorRules[i];
+            if (r == null) continue;
+            r.m_cachedLayerFor = null;
+            r.m_cachedRegexFor = null;
+        }
+    }
+
+    // Extract the first background color from a spec, resolving preset references. Used by the
+    // window to draw inline preview swatches.
+    internal static bool TryGetPreviewColor(string spec, out Color color)
+    {
+        return TryGetPreviewColorInternal(spec, 0, out color);
+    }
+
+    private static bool TryGetPreviewColorInternal(string spec, int depth, out Color color)
+    {
+        color = new Color(0.3f, 0.3f, 0.3f, 1f);
+        if (depth > 5 || string.IsNullOrEmpty(spec)) return false;
+
+        foreach (string raw in spec.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (raw.StartsWith("text:", StringComparison.OrdinalIgnoreCase) ||
+                raw.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string lower = raw.ToLowerInvariant();
+            switch (lower)
+            {
+                case "left": case "l":
+                case "center": case "centre": case "c":
+                case "right": case "r":
+                case "bold": case "b":
+                case "italic": case "i":
+                case "bolditalic": case "bi":
+                case "normal": case "n":
+                case "vertical": case "vert":
+                    continue;
+            }
+            if (lower.Length > 1 && lower[0] == 's' && int.TryParse(lower.Substring(1), out _)) continue;
+
+            int gt = raw.IndexOf('>');
+            if (gt > 0 && gt < raw.Length - 1)
+            {
+                if (TryGetColor(raw.Substring(0, gt), out color)) return true;
+                continue;
+            }
+
+            if (Presets.TryGetValue(lower, out string expansion)
+                && TryGetPreviewColorInternal(expansion, depth + 1, out color))
+                return true;
+
+            if (TryGetColor(raw, out color)) return true;
+        }
+
+        return false;
+    }
+
+    // Decomposed banner, used by the window's inline editor. Presets are expanded, so editing a
+    // preset-based banner "bakes" the resolved values into explicit tokens on write-back.
+    internal struct EditableBanner
+    {
+        public bool m_valid;
+        public string m_title;
+        public Color m_colorA;
+        public bool m_hasGradient;
+        public Color m_colorB;
+        public bool m_vertical;
+        public int m_align;        // 0 center, 1 left, 2 right
+        public int m_style;        // 0 bold, 1 normal, 2 italic, 3 bolditalic
+        public int m_size;         // 0 = default
+        public Color m_textColor;
+    }
+
+    internal static bool TryParseEditable(string name, out EditableBanner e)
+    {
+        e = new EditableBanner { m_align = 0, m_style = 0, m_size = 0, m_textColor = Color.white };
+        if (string.IsNullOrEmpty(name)) return false;
+
+        int eq = name.IndexOf('=');
+        if (eq < 0) return false;
+
+        string spec = name.Substring(0, eq).Trim();
+        e.m_title = name.Substring(eq + 1).Trim();
+        if (spec.Length == 0) return false;
+
+        char[] sep = { ' ', ',' };
+        List<string> tokens = new List<string>();
+        foreach (string raw in spec.Split(sep, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (Presets.TryGetValue(raw.ToLowerInvariant(), out string expansion))
+                tokens.AddRange(expansion.Split(sep, StringSplitOptions.RemoveEmptyEntries));
+            else
+                tokens.Add(raw);
+        }
+
+        bool hasBackground = false;
+        foreach (string token in tokens)
+        {
+            string lower = token.ToLowerInvariant();
+
+            if (lower.StartsWith("text:") || lower.StartsWith("t:"))
+            {
+                string c = token.Substring(token.IndexOf(':') + 1);
+                if (TryGetColor(c, out Color tc)) e.m_textColor = tc;
+                continue;
+            }
+
+            switch (lower)
+            {
+                case "left": case "l": e.m_align = 1; continue;
+                case "center": case "centre": case "c": e.m_align = 0; continue;
+                case "right": case "r": e.m_align = 2; continue;
+                case "bold": case "b": e.m_style = 0; continue;
+                case "normal": case "n": e.m_style = 1; continue;
+                case "italic": case "i": e.m_style = 2; continue;
+                case "bolditalic": case "bi": e.m_style = 3; continue;
+                case "vertical": case "vert": e.m_vertical = true; continue;
+            }
+
+            if (lower.Length > 1 && lower[0] == 's' && int.TryParse(lower.Substring(1), out int size))
+            {
+                e.m_size = size;
+                continue;
+            }
+
+            int gt = token.IndexOf('>');
+            if (gt > 0 && gt < token.Length - 1)
+            {
+                if (TryGetColor(token.Substring(0, gt), out Color ca) && TryGetColor(token.Substring(gt + 1), out Color cb))
+                {
+                    e.m_colorA = ca;
+                    e.m_colorB = cb;
+                    e.m_hasGradient = true;
+                    hasBackground = true;
+                    continue;
+                }
+                return false;
+            }
+
+            if (TryGetColor(token, out Color bg))
+            {
+                e.m_colorA = bg;
+                hasBackground = true;
+                continue;
+            }
+
+            return false; // unknown token -> not an editable banner
+        }
+
+        e.m_valid = hasBackground;
+        return e.m_valid;
+    }
+
+    // Used by ChromarchyBuildStripper to drop banner/separator specs from names in built scenes.
+    // Returns true when `name` is a recognized Chromarchy header or separator, and writes the
+    // cleaned title/caption into `cleaned`. The bypassing of GetHeaderInfo is intentional:
+    // we don't want build-time names to pollute the editor's render cache.
+    internal static bool TryStripName(string name, out string cleaned)
+    {
+        cleaned = name;
+        if (string.IsNullOrEmpty(name)) return false;
+
+        HeaderInfo info = ParseHeader(name);
+        try
+        {
+            if (info.m_isSeparator)
+            {
+                cleaned = info.m_separatorCaption ?? "";
+                return true;
+            }
+            if (info.m_isHeader)
+            {
+                cleaned = info.m_title ?? "";
+                return true;
+            }
+            return false;
+        }
+        finally
+        {
+            // ParseHeader allocates a Texture2D for gradient banners; release immediately.
+            if (info.m_gradientTex != null)
+                UnityEngine.Object.DestroyImmediate(info.m_gradientTex);
+        }
     }
 
     #endregion
@@ -203,13 +434,48 @@ public static class ChromarchyHeaders
             bool match = false;
             switch (r.m_match)
             {
-                case AutoColorMatch.Tag:        match = obj.tag == r.m_value; break;
-                case AutoColorMatch.Layer:      match = obj.layer == LayerMask.NameToLayer(r.m_value); break;
-                case AutoColorMatch.NamePrefix: match = obj.name.StartsWith(r.m_value, StringComparison.Ordinal); break;
+                case AutoColorMatch.Tag:
+                    match = obj.tag == r.m_value;
+                    break;
+                case AutoColorMatch.Layer:
+                    // Resolve once per value change instead of per row.
+                    if (r.m_cachedLayerFor != r.m_value)
+                    {
+                        r.m_cachedLayer = LayerMask.NameToLayer(r.m_value);
+                        r.m_cachedLayerFor = r.m_value;
+                    }
+                    match = r.m_cachedLayer >= 0 && obj.layer == r.m_cachedLayer;
+                    break;
+                case AutoColorMatch.NamePrefix:
+                    match = obj.name.StartsWith(r.m_value, StringComparison.Ordinal);
+                    break;
+                case AutoColorMatch.Regex:
+                    match = MatchRegex(r, obj.name);
+                    break;
             }
             if (match) { color = r.m_color; return true; }
         }
         return false;
+    }
+
+    // Compiles and caches the rule's regex once per pattern change. A pattern that fails to
+    // compile is cached as a null regex (with the marker set) so we never retry — and never
+    // match — until the user edits it.
+    private static bool MatchRegex(ChromarchyConfig.AutoColorRule r, string name)
+    {
+        if (r.m_cachedRegexFor != r.m_value)
+        {
+            r.m_cachedRegexFor = r.m_value;
+            try
+            {
+                r.m_cachedRegex = new System.Text.RegularExpressions.Regex(r.m_value);
+            }
+            catch (ArgumentException)
+            {
+                r.m_cachedRegex = null; // invalid pattern -> never matches
+            }
+        }
+        return r.m_cachedRegex != null && r.m_cachedRegex.IsMatch(name);
     }
 
     // Walks up to the nearest banner ancestor and returns its color at a reduced opacity
@@ -291,7 +557,7 @@ public static class ChromarchyHeaders
 
         if (string.IsNullOrEmpty(info.m_separatorCaption))
         {
-            FillRect(left, midY, right - left, 1f, line);
+            DrawStyledLine(left, midY, right - left, line, cfg.m_separatorStyle);
             return;
         }
 
@@ -305,11 +571,45 @@ public static class ChromarchyHeaders
         float capStart = center - size.x * 0.5f;
         float capEnd = center + size.x * 0.5f;
 
-        FillRect(left, midY, (capStart - 6f) - left, 1f, line);
-        FillRect(capEnd + 6f, midY, right - (capEnd + 6f), 1f, line);
+        DrawStyledLine(left, midY, (capStart - 6f) - left, line, cfg.m_separatorStyle);
+        DrawStyledLine(capEnd + 6f, midY, right - (capEnd + 6f), line, cfg.m_separatorStyle);
 
         Rect capRect = new Rect(capStart, rect.y, size.x, rect.height);
         GUI.Label(capRect, _sepContent, _sepStyle);
+    }
+
+    // Horizontal divider in one of four styles. `y` is the center line; Double straddles it.
+    private static void DrawStyledLine(float x, float y, float width, Color c, SeparatorStyle style)
+    {
+        if (width <= 0f) return;
+
+        switch (style)
+        {
+            case SeparatorStyle.Solid:
+                FillRect(x, y, width, 1f, c);
+                break;
+
+            case SeparatorStyle.Double:
+                FillRect(x, y - 1.5f, width, 1f, c);
+                FillRect(x, y + 0.5f, width, 1f, c);
+                break;
+
+            case SeparatorStyle.Dashed:
+                DrawDashes(x, y, width, c, dash: 6f, gap: 4f);
+                break;
+
+            case SeparatorStyle.Dotted:
+                DrawDashes(x, y, width, c, dash: 2f, gap: 3f);
+                break;
+        }
+    }
+
+    private static void DrawDashes(float x, float y, float width, Color c, float dash, float gap)
+    {
+        float step = dash + gap;
+        float end = x + width;
+        for (float px = x; px < end; px += step)
+            FillRect(px, y, Mathf.Min(dash, end - px), 1f, c);
     }
 
     private static void FillRect(float x, float y, float w, float h, Color c)
@@ -417,7 +717,7 @@ public static class ChromarchyHeaders
                     hasBackground = true;
                     continue;
                 }
-                return info; // malformed gradient -> not a banner
+                return default; // malformed gradient -> not a banner
             }
 
             if (TryGetColor(token, out Color bg))
@@ -427,7 +727,7 @@ public static class ChromarchyHeaders
                 continue;
             }
 
-            return info; // unknown token -> not a banner
+            return default; // unknown token -> not a banner
         }
 
         info.m_isHeader = hasBackground;
@@ -458,7 +758,7 @@ public static class ChromarchyHeaders
         return tex;
     }
 
-    private static bool TryGetColor(string value, out Color color)
+    internal static bool TryGetColor(string value, out Color color)
     {
         color = Color.clear;
         if (string.IsNullOrWhiteSpace(value)) return false;
@@ -482,8 +782,7 @@ public static class ChromarchyHeaders
         }
 
         string html = value[0] == '#' ? value : "#" + value;
-        if (ColorUtility.TryParseHtmlString(html, out color)) return true;
-        return ColorUtility.TryParseHtmlString(value, out color);
+        return ColorUtility.TryParseHtmlString(html, out color);
     }
 
     #endregion
@@ -502,6 +801,9 @@ public static class ChromarchyHeaders
     private static GUIContent _sepContent;
     private static GUIContent _starContent;
     private static bool _stylesReady;
+
+    private static bool _rgbPumping;
+    private static double _lastRgbRepaint;
 
     #endregion
 }
