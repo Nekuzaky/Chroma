@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Chromarchy.Editor
 {
-// Chromarchy: color-codes Unity's Hierarchy window. Configured via Tools/Chromarchy
+// Chroma: color-codes Unity's Hierarchy window. Configured via Tools/Chroma
 // (ChromarchyConfig asset). Optimized rendering: cached styles, Repaint guard,
 // cached parsing, cached gradient textures.
 //
@@ -15,8 +15,10 @@ namespace Chromarchy.Editor
 //   Gradient   : colorA>colorB  e.g. #1f6feb>#ff8800  or  blue>orange   (add "vertical" for top->bottom)
 //   Align      : left | center | right    Style: bold | italic | bolditalic | normal
 //   Size       : s<N>    Text: text:<color>    Preset: a key defined in the config (h1, h2, grad...)
-// EXTRAS (toggled in the panel): tree guide lines, auto-color rules (Tag/Layer/name-prefix),
-//   child-color inheritance, child count "(N)", and bookmark stars (ChromarchyBookmarks).
+//   No background: "nobg" => text-only label (row masked with the theme color, no colored block)
+// EXTRAS (toggled in the panel): tree guide lines, auto-color rules (Tag/Layer/name-prefix/regex),
+//   child-color inheritance, child count "(N)", zebra striping, animated RGB mode, bookmark stars
+//   (ChromarchyBookmarks), and Project-window folder colors (ChromarchyFolders).
 [InitializeOnLoad]
 public static class ChromarchyHeaders
 {
@@ -26,6 +28,7 @@ public static class ChromarchyHeaders
         public bool m_isSeparator;
         public string m_separatorCaption;
         public Color m_background;
+        public bool m_noBackground;     // "nobg": text-only header, row masked with the theme color
         public Texture2D m_gradientTex; // non-null => draw gradient instead of solid background
         public Color m_textColor;
         public TextAnchor m_alignment;
@@ -46,6 +49,9 @@ public static class ChromarchyHeaders
     {
         EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
         AssemblyReloadEvents.beforeAssemblyReload += ClearHeaderCache;
+        AssemblyReloadEvents.beforeAssemblyReload += ClearComponentCache;
+        EditorApplication.hierarchyChanged += ClearComponentCache;
+        ChromaBanner.Changed += OnComponentChanged;
         // Config may not be loadable yet inside the static ctor; defer the RGB pump check.
         EditorApplication.delayCall += () => EnsureRgbPump(Config);
     }
@@ -60,13 +66,26 @@ public static class ChromarchyHeaders
         ChromarchyConfig cfg = Config;
         EnsureStyles();
 
-        HeaderInfo info = (cfg.m_enableSeparators || cfg.m_enableHeaders)
+        // A ChromaBanner component takes precedence over name-based banners and keeps the name clean.
+        bool hasComp = cfg.m_enableHeaders && TryGetComponentInfo(instanceID, obj, out HeaderInfo compInfo);
+
+        HeaderInfo info = (!hasComp && (cfg.m_enableSeparators || cfg.m_enableHeaders))
             ? GetHeaderInfo(obj.name)
             : default;
 
         bool bookmarked = ChromarchyBookmarks.IsBookmarked(instanceID);
 
-        if (cfg.m_enableSeparators && info.m_isSeparator)
+        // Lowest layer: everything else paints over it.
+        if (cfg.m_zebra)
+            DrawZebra(selectionRect, cfg);
+
+        if (hasComp)
+        {
+            if (cfg.m_enableTreeLines)
+                DrawTreeLines(obj, selectionRect, cfg);
+            DrawHeader(compInfo, selectionRect);
+        }
+        else if (cfg.m_enableSeparators && info.m_isSeparator)
         {
             DrawSeparator(info, selectionRect, cfg);
         }
@@ -83,7 +102,10 @@ public static class ChromarchyHeaders
                 DrawRowTint(obj, cfg, selectionRect);
         }
 
-        // Drawn last so a banner / separator / tint background never hides it.
+        // Drawn last so a banner / separator / tint background never hides them.
+        if (cfg.m_showChildCount && !info.m_isSeparator)
+            DrawChildCount(obj, selectionRect, bookmarked);
+
         if (bookmarked)
             DrawBookmark(selectionRect);
     }
@@ -180,6 +202,7 @@ public static class ChromarchyHeaders
                 case "bolditalic": case "bi":
                 case "normal": case "n":
                 case "vertical": case "vert":
+                case "nobg": case "none":
                     continue;
             }
             if (lower.Length > 1 && lower[0] == 's' && int.TryParse(lower.Substring(1), out _)) continue;
@@ -215,6 +238,8 @@ public static class ChromarchyHeaders
         public int m_style;        // 0 bold, 1 normal, 2 italic, 3 bolditalic
         public int m_size;         // 0 = default
         public Color m_textColor;
+        public string m_bgToken;   // raw background token (color or "a>b"), for verbatim preservation
+        public string m_textToken; // raw "text:..." token, or null if none
     }
 
     internal static bool TryParseEditable(string name, out EditableBanner e)
@@ -247,7 +272,7 @@ public static class ChromarchyHeaders
             if (lower.StartsWith("text:") || lower.StartsWith("t:"))
             {
                 string c = token.Substring(token.IndexOf(':') + 1);
-                if (TryGetColor(c, out Color tc)) e.m_textColor = tc;
+                if (TryGetColor(c, out Color tc)) { e.m_textColor = tc; e.m_textToken = token; }
                 continue;
             }
 
@@ -261,6 +286,7 @@ public static class ChromarchyHeaders
                 case "italic": case "i": e.m_style = 2; continue;
                 case "bolditalic": case "bi": e.m_style = 3; continue;
                 case "vertical": case "vert": e.m_vertical = true; continue;
+                case "nobg": case "none": e.m_bgToken = "nobg"; hasBackground = true; continue;
             }
 
             if (lower.Length > 1 && lower[0] == 's' && int.TryParse(lower.Substring(1), out int size))
@@ -277,6 +303,7 @@ public static class ChromarchyHeaders
                     e.m_colorA = ca;
                     e.m_colorB = cb;
                     e.m_hasGradient = true;
+                    e.m_bgToken = token;
                     hasBackground = true;
                     continue;
                 }
@@ -286,6 +313,7 @@ public static class ChromarchyHeaders
             if (TryGetColor(token, out Color bg))
             {
                 e.m_colorA = bg;
+                e.m_bgToken = token;
                 hasBackground = true;
                 continue;
             }
@@ -342,6 +370,74 @@ public static class ChromarchyHeaders
         _headerCache.Clear();
     }
 
+    private static void OnComponentChanged()
+    {
+        ClearComponentCache();
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    private static void ClearComponentCache()
+    {
+        foreach (var kv in _compCache)
+            if (kv.Value.m_gradientTex != null)
+                UnityEngine.Object.DestroyImmediate(kv.Value.m_gradientTex);
+        _compCache.Clear();
+    }
+
+    // Cached per-object lookup of the ChromaBanner component. The cache stores a sentinel
+    // (m_isHeader == false) for objects without a banner, so GetComponent runs only on a miss.
+    // Invalidated on hierarchyChanged and ChromaBanner.Changed (add / edit / remove).
+    private static bool TryGetComponentInfo(int instanceID, GameObject obj, out HeaderInfo info)
+    {
+        if (_compCache.TryGetValue(instanceID, out info))
+            return info.m_isHeader;
+
+        ChromaBanner b = obj.GetComponent<ChromaBanner>();
+        info = (b != null && b.enabled) ? BuildInfoFromComponent(b, obj.name) : default;
+        _compCache[instanceID] = info;
+        return info.m_isHeader;
+    }
+
+    private static HeaderInfo BuildInfoFromComponent(ChromaBanner b, string objName)
+    {
+        HeaderInfo info = new HeaderInfo
+        {
+            m_isHeader = true,
+            m_background = b.m_color,
+            m_noBackground = !b.m_background,
+            m_gradientTex = null,
+            m_textColor = b.m_textColor,
+            m_alignment = AlignOf(b.m_align),
+            m_fontStyle = StyleOf(b.m_fontStyle),
+            m_fontSize = b.m_fontSize,
+            m_title = string.IsNullOrEmpty(b.m_title) ? objName : b.m_title
+        };
+        if (b.m_background && b.m_gradient)
+            info.m_gradientTex = BuildGradient(b.m_color, b.m_color2, b.m_vertical);
+        return info;
+    }
+
+    private static TextAnchor AlignOf(ChromaAlign a)
+    {
+        switch (a)
+        {
+            case ChromaAlign.Left: return TextAnchor.MiddleLeft;
+            case ChromaAlign.Right: return TextAnchor.MiddleRight;
+            default: return TextAnchor.MiddleCenter;
+        }
+    }
+
+    private static FontStyle StyleOf(ChromaFontStyle s)
+    {
+        switch (s)
+        {
+            case ChromaFontStyle.Normal: return FontStyle.Normal;
+            case ChromaFontStyle.Italic: return FontStyle.Italic;
+            case ChromaFontStyle.BoldItalic: return FontStyle.BoldAndItalic;
+            default: return FontStyle.Bold;
+        }
+    }
+
     private static ChromarchyConfig Config
     {
         get
@@ -380,8 +476,11 @@ public static class ChromarchyHeaders
         if (_stylesReady) return;
         _headerStyle = new GUIStyle(EditorStyles.boldLabel);
         _sepStyle = new GUIStyle(EditorStyles.boldLabel) { alignment = TextAnchor.MiddleCenter, fontSize = 10 };
+        _countStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight, fontSize = 9 };
         _sepContent = new GUIContent();
         _starContent = EditorGUIUtility.IconContent("Favorite Icon");
+        // Approximate Hierarchy row background, used to mask the native name on text-only ("nobg") banners.
+        _rowMaskColor = EditorGUIUtility.isProSkin ? new Color(0.219f, 0.219f, 0.219f) : new Color(0.784f, 0.784f, 0.784f);
         _stylesReady = true;
     }
 
@@ -392,7 +491,8 @@ public static class ChromarchyHeaders
         if (info.m_gradientTex != null)
             GUI.DrawTexture(fullRect, info.m_gradientTex, ScaleMode.StretchToFill);
         else
-            EditorGUI.DrawRect(fullRect, info.m_background);
+            // Text-only banner: mask the row with the theme color so the raw name doesn't bleed through.
+            EditorGUI.DrawRect(fullRect, info.m_noBackground ? _rowMaskColor : info.m_background);
 
         _headerStyle.normal.textColor = info.m_textColor;
         _headerStyle.alignment = info.m_alignment;
@@ -488,8 +588,14 @@ public static class ChromarchyHeaders
 
         while (t != null)
         {
-            HeaderInfo info = GetHeaderInfo(t.name);
-            if (info.m_isHeader)
+            // Consider a component banner first, then a name-based one. Skip "no background"
+            // banners — there's no color to inherit.
+            GameObject go = t.gameObject;
+            HeaderInfo info = TryGetComponentInfo(go.GetInstanceID(), go, out HeaderInfo ci)
+                ? ci
+                : GetHeaderInfo(go.name);
+
+            if (info.m_isHeader && !info.m_noBackground)
             {
                 float opacity = cfg.m_childInheritMode == ChildInheritMode.Flat
                     ? cfg.m_childInheritOpacity
@@ -533,6 +639,27 @@ public static class ChromarchyHeaders
             anc = anc.parent;
             k++;
         }
+    }
+
+    // Faint alternating row background. Parity is derived from the row's Y so it stays cheap and
+    // stateless; it flips when scrolling by an odd number of rows, which is the expected behavior.
+    private static void DrawZebra(Rect rect, ChromarchyConfig cfg)
+    {
+        int row = Mathf.FloorToInt(rect.y / Mathf.Max(1f, rect.height));
+        if ((row & 1) == 0) return;
+        EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), cfg.m_zebraColor);
+    }
+
+    // "(N)" child count, right-aligned. Shifts left when a bookmark star occupies the far edge.
+    private static void DrawChildCount(GameObject obj, Rect rect, bool bookmarked)
+    {
+        int n = obj.transform.childCount;
+        if (n == 0) return;
+
+        float rightPad = bookmarked ? 18f : 2f;
+        Rect countRect = new Rect(rect.x, rect.y, rect.width - rightPad, rect.height);
+        _countStyle.normal.textColor = new Color(1f, 1f, 1f, 0.4f);
+        GUI.Label(countRect, "(" + n + ")", _countStyle);
     }
 
     private static void DrawBookmark(Rect rect)
@@ -664,6 +791,7 @@ public static class ChromarchyHeaders
         char[] separators = { ' ', ',' };
         bool hasBackground = false;
         bool hasGradient = false;
+        bool hasNoBg = false;
         Color colorB = Color.clear;
         bool vertical = false;
 
@@ -697,6 +825,7 @@ public static class ChromarchyHeaders
                 case "bolditalic": case "bi": info.m_fontStyle = FontStyle.BoldAndItalic; continue;
                 case "normal": case "n": info.m_fontStyle = FontStyle.Normal; continue;
                 case "vertical": case "vert": vertical = true; continue;
+                case "nobg": case "none": hasNoBg = true; continue;
             }
 
             if (lower.Length > 1 && lower[0] == 's' && int.TryParse(lower.Substring(1), out int size))
@@ -730,7 +859,9 @@ public static class ChromarchyHeaders
             return default; // unknown token -> not a banner
         }
 
-        info.m_isHeader = hasBackground;
+        // A color makes it a banner; "nobg" makes it a text-only banner (row masked, no fill).
+        info.m_isHeader = hasBackground || hasNoBg;
+        info.m_noBackground = hasNoBg && !hasBackground;
         if (info.m_isHeader && hasGradient)
             info.m_gradientTex = BuildGradient(info.m_background, colorB, vertical);
         return info;
@@ -793,13 +924,16 @@ public static class ChromarchyHeaders
     private const float RowExtra = 40f;
 
     private static readonly Dictionary<string, HeaderInfo> _headerCache = new Dictionary<string, HeaderInfo>();
+    private static readonly Dictionary<int, HeaderInfo> _compCache = new Dictionary<int, HeaderInfo>();
     private static Dictionary<string, string> _presetCache;
     private static ChromarchyConfig _configCache;
 
     private static GUIStyle _headerStyle;
     private static GUIStyle _sepStyle;
+    private static GUIStyle _countStyle;
     private static GUIContent _sepContent;
     private static GUIContent _starContent;
+    private static Color _rowMaskColor;
     private static bool _stylesReady;
 
     private static bool _rgbPumping;

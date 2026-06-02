@@ -14,31 +14,40 @@ MonoBehaviour:
   m_EditorClassIdentifier: Chromarchy.Editor::Chromarchy.Editor.ChromarchyConfig
   m_enableHeaders: 1
   m_enableTreeLines: 1
-  m_treeLineColor: {r: 0.16907978, g: 1, b: 0, a: 0.15}
+  m_treeLineColor: {r: 0.4, g: 0.7, b: 1, a: 0.25}
+  m_showChildCount: 0
+  m_zebra: 0
+  m_zebraColor: {r: 1, g: 1, b: 1, a: 0.03}
+  m_enableFolderColors: 1
+  m_folderColors: []
   m_enableSeparators: 1
-  m_separatorColor: {r: 0.757576, g: 1, b: 0, a: 1}
-  m_separatorFillColor: {r: 0.22, g: 0.22, b: 0.22, a: 1}
+  m_separatorColor: {r: 0.9, g: 0.9, b: 0.95, a: 1}
+  m_separatorFillColor: {r: 0.16, g: 0.17, b: 0.22, a: 1}
+  m_separatorStyle: 3
   m_separatorBold: 1
-  m_separatorItalic: 0
-  m_separatorUppercase: 0
+  m_separatorItalic: 1
+  m_separatorUppercase: 1
   m_enableChildInherit: 1
-  m_childInheritMode: 1
-  m_childInheritOpacity: 0.25
-  m_childInheritFalloff: 0.831
-  m_autoColorRules:
-  - m_enabled: 1
-    m_match: 0
-    m_value: Player
-    m_color: {r: 0.82427204, g: 1, b: 0, a: 0.18}
+  m_childInheritMode: 0
+  m_childInheritOpacity: 0.15
+  m_childInheritFalloff: 0.5
+  m_autoColorRules: []
+  m_stripNamesInBuild: 1
+  m_rgbMode: 1
+  m_rgbSpeed: 1.653
+  m_rgbSaturation: 0.993
+  m_rgbValue: 1
+  m_rgbAlpha: 0.471
+  m_rgbSpread: 0.02
   m_presets:
   - m_key: h1
     m_spec: '#1f6feb center bold s12 text:white'
   - m_key: h2
-    m_spec: gray left bold text:white
+    m_spec: '#e0457b left bold text:white'
   - m_key: h3
-    m_spec: '#3a3f44 left italic text:white'
+    m_spec: '#1ca672 left italic text:white'
   - m_key: cat
-    m_spec: '#444 left bold text:white'
+    m_spec: '#f0883e left bold text:white'
   - m_key: grad
     m_spec: '#1f6feb>#7b2ff7 center bold text:white'
-  m_version: 571
+  m_version: 844

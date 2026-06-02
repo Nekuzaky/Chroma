@@ -7,16 +7,13 @@ using UnityEngine;
 
 namespace Chromarchy.Editor
 {
-// Config panel for Chromarchy. Open via Tools/Chromarchy or GameObject/Chromarchy/Open Window.
+// Chroma control panel. Open via Tools/Chroma or GameObject/Chroma/Open Window.
+// Two tabs: "Selection" (everything about the selected object) and "Settings" (global config).
 public class ChromarchyWindow : EditorWindow
 {
-    private enum ApplyMode { Preset, Custom }
-
-    #region Publics
-
-
-    #endregion
-
+    private enum Tab { Selection, Settings }
+    private enum OutputMode { Name, Component }
+    private enum SelSource { None, NameBanner, Component }
 
     #region Unity API
 
@@ -25,13 +22,13 @@ public class ChromarchyWindow : EditorWindow
         _config = ChromarchyConfig.GetOrCreate();
         _so = new SerializedObject(_config);
         ChromarchyHeaders.OnConfigChanged(_config);
-        wantsMouseMove = true; // enables live hover highlight on section headers
-        RefreshEditState();
+        wantsMouseMove = true; // live hover highlight on section headers
+        _tab = (Tab)EditorPrefs.GetInt("Chroma.Tab", 0);
     }
 
     private void OnSelectionChange()
     {
-        RefreshEditState();
+        // The selection panel re-evaluates itself in the draw loop (SyncSelection); just repaint.
         Repaint();
     }
 
@@ -42,18 +39,555 @@ public class ChromarchyWindow : EditorWindow
         _so.Update();
 
         DrawHeaderBar();
+        DrawTabBar();
 
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
         EditorGUILayout.Space(6);
 
-        // Local fields + object renaming / EditorPrefs: these do NOT touch the config asset.
-        if (BeginSection("Apply to selection", "apply")) DrawApplyBody();
+        if (_tab == Tab.Selection) DrawSelectionTab();
+        else DrawSettingsTab();
+
+        EditorGUILayout.EndScrollView();
+    }
+
+    #endregion
+
+
+    #region Main API
+
+    [MenuItem("Tools/Chroma")]
+    private static void Open()
+    {
+        var win = GetWindow<ChromarchyWindow>("Chroma");
+        win.minSize = new Vector2(360f, 480f);
+    }
+
+    #endregion
+
+
+    #region Chrome (header, tabs, sections)
+
+    private void EnsureStyles()
+    {
+        if (_stylesBuilt) return;
+        bool pro = EditorGUIUtility.isProSkin;
+
+        _titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
+        _titleStyle.normal.textColor = Color.white;
+        _subTitleStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft };
+        _subTitleStyle.normal.textColor = new Color(1f, 1f, 1f, 0.55f);
+
+        _sectionStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12, alignment = TextAnchor.MiddleLeft };
+        _sectionStyle.normal.textColor = pro ? new Color(0.85f, 0.87f, 0.92f) : new Color(0.15f, 0.16f, 0.20f);
+
+        _cardBody = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(8, 8, 8, 8) };
+        _bookmarkRowStyle = new GUIStyle(EditorStyles.label);
+        _previewStyle = new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleCenter };
+
+        _accent = new Color(0.27f, 0.52f, 1f);
+        _accentDim = new Color(0.45f, 0.30f, 0.85f);
+        _headerBarColor = new Color(0.16f, 0.18f, 0.22f);
+        _sectionHeaderBg = pro ? new Color(0.25f, 0.27f, 0.31f) : new Color(0.74f, 0.76f, 0.81f);
+        _sectionHeaderHover = pro ? new Color(0.30f, 0.33f, 0.38f) : new Color(0.80f, 0.82f, 0.88f);
+        _previewMaskColor = pro ? new Color(0.219f, 0.219f, 0.219f) : new Color(0.784f, 0.784f, 0.784f);
+
+        _stylesBuilt = true;
+    }
+
+    private void DrawHeaderBar()
+    {
+        Rect r = GUILayoutUtility.GetRect(0f, 60f, GUILayout.ExpandWidth(true));
+        EditorGUI.DrawRect(r, _headerBarColor);
+
+        EditorGUI.DrawRect(new Rect(r.x + 12f, r.y + 9f, 14f, 14f), _accent);
+        EditorGUI.DrawRect(new Rect(r.x + 16f, r.y + 13f, 14f, 14f), _accentDim);
+
+        GUI.Label(new Rect(r.x + 38f, r.y + 5f, r.width - 50f, 18f), "Chroma", _titleStyle);
+        GUI.Label(new Rect(r.x + 38f, r.y + 21f, r.width - 50f, 14f), "Color-code your hierarchy", _subTitleStyle);
+
+        Rect searchRect = new Rect(r.x + 12f, r.y + 38f, r.width - 24f, 18f);
+        _search = EditorGUI.TextField(searchRect, _search, EditorStyles.toolbarSearchField);
+
+        float half = r.width * 0.5f;
+        EditorGUI.DrawRect(new Rect(r.x, r.yMax - 2f, half, 2f), _accent);
+        EditorGUI.DrawRect(new Rect(r.x + half, r.yMax - 2f, r.width - half, 2f), _accentDim);
+    }
+
+    private void DrawTabBar()
+    {
+        int t = GUILayout.Toolbar((int)_tab, _tabLabels, GUILayout.Height(24));
+        if (t != (int)_tab)
+        {
+            _tab = (Tab)t;
+            EditorPrefs.SetInt("Chroma.Tab", t);
+            GUI.FocusControl(null);
+        }
+    }
+
+    private AnimBool GetAnim(string key, bool initial)
+    {
+        if (_anims.TryGetValue(key, out AnimBool anim)) return anim;
+        anim = new AnimBool(initial) { speed = 3.5f };
+        anim.valueChanged.AddListener(Repaint);
+        _anims[key] = anim;
+        return anim;
+    }
+
+    // Foldable card section: custom header strip (accent + triangle + hover) and an animated,
+    // padded body. Open state persisted in EditorPrefs. Returns true when the body should draw.
+    private bool BeginSection(string title, string key)
+    {
+        EditorGUILayout.Space(4);
+        string prefKey = "Chromarchy.Fold." + key;
+        bool open = EditorPrefs.GetBool(prefKey, true);
+
+        Rect rect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
+        bool hover = rect.Contains(Event.current.mousePosition);
+        EditorGUI.DrawRect(rect, hover ? _sectionHeaderHover : _sectionHeaderBg);
+        EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), open ? _accent : _accentDim);
+        GUI.Label(new Rect(rect.x + 12f, rect.y, rect.width - 14f, rect.height),
+            (open ? "▾  " : "▸  ") + title, _sectionStyle);
+
+        if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
+        {
+            bool prevChanged = GUI.changed;
+            EditorPrefs.SetBool(prefKey, !open);
+            GUI.changed = prevChanged;
+            Event.current.Use();
+            Repaint();
+        }
+
+        AnimBool anim = GetAnim(key, open);
+        anim.target = open;
+
+        _sectionShown = EditorGUILayout.BeginFadeGroup(anim.faded);
+        if (_sectionShown) EditorGUILayout.BeginVertical(_cardBody);
+        return _sectionShown;
+    }
+
+    private void EndSection()
+    {
+        if (_sectionShown) EditorGUILayout.EndVertical();
+        EditorGUILayout.EndFadeGroup();
+        EditorGUILayout.Space(2);
+    }
+
+    #endregion
+
+
+    #region Selection tab
+
+    private void DrawSelectionTab()
+    {
+        SyncSelection();
+        int count = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
+
+        EditorGUILayout.BeginVertical(_cardBody);
+
+        // Context line.
+        string status;
+        if (count == 0) status = "Nothing selected";
+        else if (count > 1) status = count + " objects selected — new banner";
+        else if (_selSource == SelSource.Component) status = "Editing  " + _selObject.name + "   • component";
+        else if (_selSource == SelSource.NameBanner) status = "Editing  " + _selObject.name + "   • name banner";
+        else status = _selObject.name + "   • new banner";
+        EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
+
+        DrawPreview();
+        EditorGUILayout.Space(6);
+
+        _dTitle = EditorGUILayout.TextField(new GUIContent("Title", "Empty = keep each object's name"), _dTitle);
+
+        _dBackground = EditorGUILayout.Toggle("Background", _dBackground);
+        using (new EditorGUI.DisabledScope(!_dBackground))
+        {
+            EditorGUI.indentLevel++;
+            _dColor = EditorGUILayout.ColorField("Color", _dColor);
+            _dGradient = EditorGUILayout.Toggle("Gradient", _dGradient);
+            using (new EditorGUI.DisabledScope(!_dGradient))
+            {
+                EditorGUI.indentLevel++;
+                _dColor2 = EditorGUILayout.ColorField("Color 2", _dColor2);
+                _dVertical = EditorGUILayout.Toggle("Vertical", _dVertical);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUI.indentLevel--;
+        }
+        if (!_dBackground)
+            EditorGUILayout.LabelField("   Text-only label (no colored block).", EditorStyles.miniLabel);
+
+        _dTextColor = EditorGUILayout.ColorField("Text color", _dTextColor);
+        _dAlign = EditorGUILayout.Popup("Alignment", _dAlign, AlignLabels);
+        _dStyle = EditorGUILayout.Popup("Style", _dStyle, StyleLabels);
+        _dSize = EditorGUILayout.IntField("Size (0 = default)", _dSize);
+
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Label("Store as", GUILayout.Width(EditorGUIUtility.labelWidth));
+        _outputMode = (OutputMode)GUILayout.Toolbar((int)_outputMode, _outputLabels);
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            _outputMode == OutputMode.Component
+                ? "   Adds a component — the object keeps its name."
+                : "   Encodes the style in the object's name.",
+            EditorStyles.miniLabel);
+
+        EditorGUILayout.Space(6);
+        bool editing = count == 1 && _selSource != SelSource.None;
+        using (new EditorGUI.DisabledScope(count == 0))
+        {
+            Color prev = GUI.backgroundColor;
+            if (count > 0) GUI.backgroundColor = _accent;
+            string label = (editing ? "Apply changes" : "Apply banner") + " (" + count + ")";
+            if (GUILayout.Button(label, GUILayout.Height(28)))
+                ApplyDraft();
+            GUI.backgroundColor = prev;
+        }
+        if (count == 1 && _selSource == SelSource.NameBanner)
+            if (GUILayout.Button("Apply title only  (keep colors)", GUILayout.Height(20)))
+                ApplyTitleOnly();
+
+        EditorGUILayout.EndVertical();
+
+        if (BeginSection("Quick recolor", "recolor")) DrawRecolor(count);
         EndSection();
+
+        if (_config.m_presets.Count > 0)
+        {
+            if (BeginSection("Quick preset", "quickpreset")) DrawQuickPreset(count);
+            EndSection();
+        }
 
         if (BeginSection("Bookmarks", "bookmarks")) DrawBookmarks();
         EndSection();
+    }
 
-        // Asset editing: only these changes mark the config dirty.
+    private void DrawPreview()
+    {
+        Rect r = GUILayoutUtility.GetRect(0f, 28f, GUILayout.ExpandWidth(true));
+
+        if (!_dBackground)
+            EditorGUI.DrawRect(r, _previewMaskColor);
+        else if (_dGradient)
+            DrawGradientRect(r, _dColor, _dColor2, _dVertical);
+        else
+            EditorGUI.DrawRect(r, _dColor);
+
+        _previewStyle.alignment = AlignAnchor(_dAlign);
+        _previewStyle.fontStyle = FontStyleOf(_dStyle);
+        _previewStyle.fontSize = _dSize > 0 ? Mathf.Min(_dSize, 18) : 12; // clamp so it fits the preview row
+        _previewStyle.normal.textColor = _dTextColor;
+
+        string txt = !string.IsNullOrEmpty(_dTitle) ? _dTitle
+            : (_selObject != null ? _selObject.name : "Preview");
+        Rect tr = new Rect(r.x + 6f, r.y, r.width - 12f, r.height);
+        GUI.Label(tr, txt, _previewStyle);
+    }
+
+    private void DrawRecolor(int count)
+    {
+        EditorGUILayout.LabelField("Recolors the selection (name banner or component).", EditorStyles.miniLabel);
+        using (new EditorGUI.DisabledScope(count == 0))
+        {
+            const int perRow = 5;
+            for (int i = 0; i < Swatches.Length; i++)
+            {
+                if (i % perRow == 0) EditorGUILayout.BeginHorizontal();
+
+                Color prev = GUI.backgroundColor;
+                GUI.backgroundColor = Swatches[i].m_color;
+                if (GUILayout.Button(Swatches[i].m_name, GUILayout.Height(22)))
+                    RecolorSelection(Swatches[i].m_name);
+                GUI.backgroundColor = prev;
+
+                if (i % perRow == perRow - 1 || i == Swatches.Length - 1) EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        _freeRecolorColor = EditorGUILayout.ColorField(GUIContent.none, _freeRecolorColor, false, false, false, GUILayout.Width(50));
+        using (new EditorGUI.DisabledScope(count == 0))
+            if (GUILayout.Button("Recolor with custom", GUILayout.Height(20)))
+                RecolorSelection("#" + ColorUtility.ToHtmlStringRGB(_freeRecolorColor));
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawQuickPreset(int count)
+    {
+        string[] keys = new string[_config.m_presets.Count];
+        for (int i = 0; i < keys.Length; i++) keys[i] = _config.m_presets[i].m_key;
+        _presetIndex = Mathf.Clamp(_presetIndex, 0, keys.Length - 1);
+
+        EditorGUILayout.BeginHorizontal();
+        _presetIndex = EditorGUILayout.Popup(_presetIndex, keys);
+        using (new EditorGUI.DisabledScope(count == 0))
+            if (GUILayout.Button("Apply preset", GUILayout.Width(96)))
+                ApplyPresetToSelection(keys[_presetIndex]);
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField("Writes a short '" + keys[_presetIndex] + "=Title' to the name.", EditorStyles.miniLabel);
+    }
+
+    #endregion
+
+
+    #region Selection logic
+
+    private void SyncSelection()
+    {
+        GameObject current = (Selection.gameObjects != null && Selection.gameObjects.Length == 1)
+            ? Selection.gameObjects[0]
+            : null;
+        string currentName = current != null ? current.name : null;
+        if (current != _selEvaluatedFor || currentName != _selEvaluatedName)
+        {
+            _selEvaluatedFor = current;
+            _selEvaluatedName = currentName;
+            RefreshDraft();
+        }
+    }
+
+    // Pre-fills the draft from the single selected object when it's already a banner (component
+    // first, then name-based). Non-banner / multi selections leave the draft untouched so a setup
+    // can be reused across objects.
+    private void RefreshDraft()
+    {
+        _selSource = SelSource.None;
+        _selObject = null;
+        _selOriginalSpec = "";
+
+        GameObject[] sel = Selection.gameObjects;
+        if (sel == null || sel.Length != 1 || sel[0] == null) return;
+        GameObject go = sel[0];
+        _selObject = go;
+
+        ChromaBanner comp = go.GetComponent<ChromaBanner>();
+        if (comp != null)
+        {
+            _selSource = SelSource.Component;
+            _outputMode = OutputMode.Component;
+            _dTitle = comp.m_title;
+            _dBackground = comp.m_background;
+            _dColor = comp.m_color;
+            _dGradient = comp.m_gradient;
+            _dColor2 = comp.m_color2;
+            _dVertical = comp.m_vertical;
+            _dTextColor = comp.m_textColor;
+            _dAlign = (int)comp.m_align;
+            _dStyle = (int)comp.m_fontStyle;
+            _dSize = comp.m_fontSize;
+            return;
+        }
+
+        if (ChromarchyHeaders.TryParseEditable(go.name, out ChromarchyHeaders.EditableBanner e) && e.m_valid)
+        {
+            _selSource = SelSource.NameBanner;
+            _outputMode = OutputMode.Name;
+            _dTitle = e.m_title;
+            _dBackground = e.m_bgToken != "nobg";
+            _dColor = e.m_colorA;
+            _dGradient = e.m_hasGradient;
+            _dColor2 = e.m_colorB;
+            _dVertical = e.m_vertical;
+            _dTextColor = e.m_textColor;
+            _dAlign = e.m_align;
+            _dStyle = e.m_style;
+            _dSize = e.m_size;
+
+            int eq = go.name.IndexOf('=');
+            _selOriginalSpec = eq >= 0 ? go.name.Substring(0, eq).Trim() : "";
+        }
+    }
+
+    private void ApplyDraft()
+    {
+        GameObject[] sel = Selection.gameObjects;
+        if (sel == null) return;
+        foreach (GameObject go in sel)
+        {
+            if (go == null) continue;
+            if (_outputMode == OutputMode.Component) WriteComponent(go);
+            else WriteName(go);
+        }
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    private void WriteComponent(GameObject go)
+    {
+        ChromaBanner b = go.GetComponent<ChromaBanner>();
+        if (b == null) b = Undo.AddComponent<ChromaBanner>(go);
+        else Undo.RecordObject(b, "Chroma: set banner");
+
+        b.m_background = _dBackground;
+        b.m_color = _dColor;
+        b.m_gradient = _dBackground && _dGradient;
+        b.m_color2 = _dColor2;
+        b.m_vertical = _dVertical;
+        b.m_textColor = _dTextColor;
+        b.m_align = (ChromaAlign)_dAlign;
+        b.m_fontStyle = (ChromaFontStyle)_dStyle;
+        b.m_fontSize = _dSize;
+        b.m_title = _dTitle; // empty = use the GameObject's name
+        EditorUtility.SetDirty(b);
+    }
+
+    private void WriteName(GameObject go)
+    {
+        Undo.RecordObject(go, "Chroma: apply banner");
+        string title = !string.IsNullOrEmpty(_dTitle) ? _dTitle : ExtractTitle(go.name);
+        go.name = BuildDraftSpec() + "=" + title;
+        EditorUtility.SetDirty(go);
+    }
+
+    private void ApplyTitleOnly()
+    {
+        if (_selObject == null) return;
+        Undo.RecordObject(_selObject, "Chroma: edit title");
+        _selObject.name = _selOriginalSpec + "=" + _dTitle;
+        EditorUtility.SetDirty(_selObject);
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    private string BuildDraftSpec()
+    {
+        string spec;
+        if (!_dBackground)
+        {
+            spec = "nobg";
+        }
+        else
+        {
+            spec = "#" + ColorUtility.ToHtmlStringRGB(_dColor);
+            if (_dGradient) spec += ">#" + ColorUtility.ToHtmlStringRGB(_dColor2);
+        }
+        if (_dAlign == 1) spec += " left";
+        else if (_dAlign == 2) spec += " right";
+        if (_dStyle == 1) spec += " normal";
+        else if (_dStyle == 2) spec += " italic";
+        else if (_dStyle == 3) spec += " bolditalic";
+        if (_dSize > 0) spec += " s" + _dSize;
+        if (_dBackground && _dGradient && _dVertical) spec += " vertical";
+        if (_dTextColor != Color.white) spec += " text:#" + ColorUtility.ToHtmlStringRGB(_dTextColor);
+        return spec;
+    }
+
+    private void ApplyPresetToSelection(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return;
+        foreach (GameObject go in Selection.gameObjects)
+        {
+            if (go == null) continue;
+            Undo.RecordObject(go, "Chroma: apply preset");
+            string title = !string.IsNullOrEmpty(_dTitle) ? _dTitle : ExtractTitle(go.name);
+            go.name = key + "=" + title;
+            EditorUtility.SetDirty(go);
+        }
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    // Recolors the selection: sets the component color if there is one, else rewrites the name's color.
+    private void RecolorSelection(string colorToken)
+    {
+        ChromarchyHeaders.TryGetColor(colorToken, out Color col);
+        foreach (GameObject go in Selection.gameObjects)
+        {
+            if (go == null) continue;
+            ChromaBanner b = go.GetComponent<ChromaBanner>();
+            if (b != null)
+            {
+                Undo.RecordObject(b, "Chroma: recolor");
+                b.m_background = true;
+                b.m_gradient = false;
+                b.m_color = col;
+                EditorUtility.SetDirty(b);
+            }
+            else
+            {
+                Undo.RecordObject(go, "Chroma: recolor");
+                go.name = ReplaceColor(go.name, colorToken);
+                EditorUtility.SetDirty(go);
+            }
+        }
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
+    private void DrawBookmarks()
+    {
+        int sel = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
+        using (new EditorGUI.DisabledScope(sel == 0))
+            if (GUILayout.Button("Bookmark selection (" + sel + ")"))
+                foreach (GameObject go in Selection.gameObjects)
+                    ChromarchyBookmarks.Add(go);
+
+        IReadOnlyList<string> gids = ChromarchyBookmarks.Gids;
+        if (gids.Count == 0)
+        {
+            EditorGUILayout.LabelField("No bookmarks", EditorStyles.miniLabel);
+            return;
+        }
+
+        bool hasSearch = !string.IsNullOrWhiteSpace(_search);
+        string removeGid = null;
+        int moveFrom = -1, moveTo = -1;
+        GameObject jumpTarget = null;
+        int shown = 0;
+
+        for (int i = 0; i < gids.Count; i++)
+        {
+            string gid = gids[i];
+            GameObject go = ChromarchyBookmarks.ResolveGid(gid);
+            string label = go != null ? go.name : "(not in open scene)";
+
+            if (hasSearch && label.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            shown++;
+
+            EditorGUILayout.BeginHorizontal();
+
+            using (new EditorGUI.DisabledScope(hasSearch || i == 0))
+                if (GUILayout.Button("▲", GUILayout.Width(22), GUILayout.Height(18))) { moveFrom = i; moveTo = i - 1; }
+            using (new EditorGUI.DisabledScope(hasSearch || i == gids.Count - 1))
+                if (GUILayout.Button("▼", GUILayout.Width(22), GUILayout.Height(18))) { moveFrom = i; moveTo = i + 1; }
+
+            GUILayout.Label(label, _bookmarkRowStyle, GUILayout.ExpandWidth(true));
+            Rect labelRect = GUILayoutUtility.GetLastRect();
+            if (go != null
+                && Event.current.type == EventType.MouseDown
+                && Event.current.clickCount == 2
+                && labelRect.Contains(Event.current.mousePosition))
+            {
+                jumpTarget = go;
+                Event.current.Use();
+            }
+
+            using (new EditorGUI.DisabledScope(go == null))
+                if (GUILayout.Button("Go", GUILayout.Width(34))) jumpTarget = go;
+            if (GUILayout.Button("X", GUILayout.Width(22))) removeGid = gid;
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        if (hasSearch && shown == 0)
+            EditorGUILayout.LabelField("No bookmark matches '" + _search + "'", EditorStyles.miniLabel);
+
+        if (jumpTarget != null) ChromarchyBookmarks.Jump(jumpTarget);
+        else if (moveFrom >= 0 && moveTo >= 0) ChromarchyBookmarks.Reorder(moveFrom, moveTo);
+        else if (removeGid != null) ChromarchyBookmarks.Remove(removeGid);
+    }
+
+    #endregion
+
+
+    #region Settings tab
+
+    private void DrawSettingsTab()
+    {
+        // Self-managed sections (own undo / version bumps), kept outside the change-check.
+        if (BeginSection("Folder colors", "folders")) DrawFolderColors();
+        EndSection();
+
+        if (BeginSection("Themes", "themes")) DrawThemes();
+        EndSection();
+
         EditorGUI.BeginChangeCheck();
 
         if (BeginSection("Display", "display")) DrawToggles();
@@ -71,10 +605,10 @@ public class ChromarchyWindow : EditorWindow
         if (BeginSection("Auto-color rules", "autocolor")) DrawAutoColorRules();
         EndSection();
 
-        if (BeginSection("Build", "build")) DrawBuildSection();
+        if (BeginSection("RGB mode", "rgb")) DrawRgbSection();
         EndSection();
 
-        if (BeginSection("RGB mode", "rgb")) DrawRgbSection();
+        if (BeginSection("Build", "build")) DrawBuildSection();
         EndSection();
 
         if (BeginSection("Banner presets", "presets")) DrawPresets();
@@ -89,159 +623,17 @@ public class ChromarchyWindow : EditorWindow
         }
 
         DrawFooter();
-
-        EditorGUILayout.EndScrollView();
-    }
-
-    #endregion
-
-
-    #region Main API
-
-    [MenuItem("Tools/Chromarchy")]
-    private static void Open()
-    {
-        var win = GetWindow<ChromarchyWindow>("Chromarchy");
-        win.minSize = new Vector2(380f, 520f);
-    }
-
-    private void ApplyToSelection()
-    {
-        string spec = BuildSpec();
-        if (string.IsNullOrEmpty(spec)) return;
-
-        foreach (GameObject go in Selection.gameObjects)
-        {
-            Undo.RecordObject(go, "Chromarchy: apply banner");
-            string title = !string.IsNullOrEmpty(_applyTitle) ? _applyTitle : ExtractTitle(go.name);
-            go.name = spec + "=" + title;
-            EditorUtility.SetDirty(go);
-        }
-        EditorApplication.RepaintHierarchyWindow();
-    }
-
-    private void RecolorSelection(string colorToken)
-    {
-        foreach (GameObject go in Selection.gameObjects)
-        {
-            Undo.RecordObject(go, "Chromarchy: recolor");
-            go.name = ReplaceColor(go.name, colorToken);
-            EditorUtility.SetDirty(go);
-        }
-        EditorApplication.RepaintHierarchyWindow();
-    }
-
-    #endregion
-
-
-    #region Tools and Utilies
-
-    private void EnsureStyles()
-    {
-        if (_stylesBuilt) return;
-        bool pro = EditorGUIUtility.isProSkin;
-
-        _titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
-        _titleStyle.normal.textColor = Color.white;
-        _subTitleStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft };
-        _subTitleStyle.normal.textColor = new Color(1f, 1f, 1f, 0.55f);
-
-        _sectionStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12, alignment = TextAnchor.MiddleLeft };
-        _sectionStyle.normal.textColor = pro ? new Color(0.85f, 0.87f, 0.92f) : new Color(0.15f, 0.16f, 0.20f);
-
-        _cardBody = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(8, 8, 6, 8) };
-        _bookmarkRowStyle = new GUIStyle(EditorStyles.label);
-
-        _accent = new Color(0.27f, 0.52f, 1f);
-        _accentDim = new Color(0.45f, 0.30f, 0.85f);
-        _headerBarColor = new Color(0.16f, 0.18f, 0.22f);
-        _sectionHeaderBg = pro ? new Color(0.25f, 0.27f, 0.31f) : new Color(0.74f, 0.76f, 0.81f);
-        _sectionHeaderHover = pro ? new Color(0.30f, 0.33f, 0.38f) : new Color(0.80f, 0.82f, 0.88f);
-
-        _stylesBuilt = true;
-    }
-
-    private void DrawHeaderBar()
-    {
-        Rect r = GUILayoutUtility.GetRect(0f, 60f, GUILayout.ExpandWidth(true));
-        EditorGUI.DrawRect(r, _headerBarColor);
-
-        // Accent square "logo" + two-tone underline give the bar a designed feel.
-        EditorGUI.DrawRect(new Rect(r.x + 12f, r.y + 9f, 14f, 14f), _accent);
-        EditorGUI.DrawRect(new Rect(r.x + 16f, r.y + 13f, 14f, 14f), _accentDim);
-
-        Rect titleRect = new Rect(r.x + 38f, r.y + 5f, r.width - 50f, 18f);
-        GUI.Label(titleRect, "Chromarchy", _titleStyle);
-        Rect subRect = new Rect(r.x + 38f, r.y + 21f, r.width - 50f, 14f);
-        GUI.Label(subRect, "Color-code your hierarchy", _subTitleStyle);
-
-        Rect searchRect = new Rect(r.x + 12f, r.y + 38f, r.width - 24f, 18f);
-        _search = EditorGUI.TextField(searchRect, _search, EditorStyles.toolbarSearchField);
-
-        // Accent underline: blue fading into purple across the bar width.
-        float half = r.width * 0.5f;
-        EditorGUI.DrawRect(new Rect(r.x, r.yMax - 2f, half, 2f), _accent);
-        EditorGUI.DrawRect(new Rect(r.x + half, r.yMax - 2f, r.width - half, 2f), _accentDim);
-    }
-
-    private AnimBool GetAnim(string key, bool initial)
-    {
-        if (_anims.TryGetValue(key, out AnimBool anim)) return anim;
-        anim = new AnimBool(initial);
-        anim.speed = 3.5f; // snappy but visibly smooth
-        anim.valueChanged.AddListener(Repaint);
-        _anims[key] = anim;
-        return anim;
-    }
-
-    // Foldable card section. Header strip is custom-drawn (accent bar + triangle + hover); the body
-    // is a padded helpBox card that animates open/closed. Open state persisted via EditorPrefs.
-    // Returns true when the body should be drawn (open or mid-animation).
-    private bool BeginSection(string title, string key)
-    {
-        EditorGUILayout.Space(4);
-        string prefKey = "Chromarchy.Fold." + key;
-        bool open = EditorPrefs.GetBool(prefKey, true);
-
-        Rect rect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
-        bool hover = rect.Contains(Event.current.mousePosition);
-        EditorGUI.DrawRect(rect, hover ? _sectionHeaderHover : _sectionHeaderBg);
-        EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), open ? _accent : _accentDim);
-        GUI.Label(new Rect(rect.x + 12f, rect.y, rect.width - 14f, rect.height),
-            (open ? "▾  " : "▸  ") + title, _sectionStyle);
-
-        // Toggle on header click. We persist the new state and Repaint, but do NOT flip `open`
-        // this pass: changing the layout-group count during a non-Layout event would desync
-        // IMGUI. The new state takes effect on the next frame. GUI.changed is preserved so the
-        // toggle never trips the surrounding config change-check.
-        if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
-        {
-            bool prevChanged = GUI.changed;
-            EditorPrefs.SetBool(prefKey, !open);
-            GUI.changed = prevChanged;
-            Event.current.Use();
-            Repaint();
-        }
-
-        AnimBool anim = GetAnim(key, open);
-        anim.target = open;
-
-        // BeginFadeGroup must always be paired with EndFadeGroup; BeginVertical only when shown.
-        _sectionShown = EditorGUILayout.BeginFadeGroup(anim.faded);
-        if (_sectionShown) EditorGUILayout.BeginVertical(_cardBody);
-        return _sectionShown;
-    }
-
-    private void EndSection()
-    {
-        if (_sectionShown) EditorGUILayout.EndVertical();
-        EditorGUILayout.EndFadeGroup();
-        EditorGUILayout.Space(2);
     }
 
     private void DrawToggles()
     {
         EditorGUILayout.PropertyField(_so.FindProperty("m_enableHeaders"), new GUIContent("Section banners"));
+        EditorGUILayout.PropertyField(_so.FindProperty("m_showChildCount"), new GUIContent("Child count (N)"));
+
+        SerializedProperty zebra = _so.FindProperty("m_zebra");
+        EditorGUILayout.PropertyField(zebra, new GUIContent("Zebra striping"));
+        using (new EditorGUI.DisabledScope(!zebra.boolValue))
+            EditorGUILayout.PropertyField(_so.FindProperty("m_zebraColor"), new GUIContent("Stripe color"));
     }
 
     private void DrawTreeLinesSection()
@@ -289,8 +681,8 @@ public class ChromarchyWindow : EditorWindow
     {
         EditorGUILayout.PropertyField(_so.FindProperty("m_stripNamesInBuild"),
             new GUIContent("Strip names in build",
-                "When ON, GameObject names with Chromarchy specs ('#xxx center bold=Title') are reduced to just 'Title' in built scenes. Scene .unity assets on disk are not modified."));
-        EditorGUILayout.LabelField("Editor-only — scene assets are untouched.", EditorStyles.miniLabel);
+                "When ON, GameObject names with Chroma specs ('#xxx center bold=Title') are reduced to just 'Title' in built scenes. Scene .unity assets on disk are not modified."));
+        EditorGUILayout.LabelField("ChromaBanner components are always removed from builds.", EditorStyles.miniLabel);
     }
 
     private void DrawAutoColorRules()
@@ -336,160 +728,6 @@ public class ChromarchyWindow : EditorWindow
         }
     }
 
-    private void DrawApplyBody()
-    {
-        int count = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
-
-        DrawSelectedBannerEditor();
-
-        EditorGUILayout.LabelField(count == 0 ? "No object selected" : count + " object(s) selected", EditorStyles.miniLabel);
-
-        _applyMode = (ApplyMode)EditorGUILayout.EnumPopup("Mode", _applyMode);
-
-        if (_applyMode == ApplyMode.Preset)
-        {
-            if (_config.m_presets.Count == 0)
-            {
-                EditorGUILayout.HelpBox("No preset defined.", MessageType.Info);
-            }
-            else
-            {
-                string[] keys = new string[_config.m_presets.Count];
-                for (int i = 0; i < keys.Length; i++) keys[i] = _config.m_presets[i].m_key;
-                _presetIndex = Mathf.Clamp(_presetIndex, 0, keys.Length - 1);
-                _presetIndex = EditorGUILayout.Popup("Preset", _presetIndex, keys);
-            }
-        }
-        else
-        {
-            _customColor = EditorGUILayout.ColorField("Background color", _customColor);
-            _customGradient = EditorGUILayout.ToggleLeft("Gradient", _customGradient);
-            if (_customGradient)
-            {
-                EditorGUI.indentLevel++;
-                _customColor2 = EditorGUILayout.ColorField("Color 2", _customColor2);
-                _customVertical = EditorGUILayout.ToggleLeft("Vertical", _customVertical);
-                EditorGUI.indentLevel--;
-            }
-            _alignIndex = EditorGUILayout.Popup("Alignment", _alignIndex, AlignLabels);
-            _styleIndex = EditorGUILayout.Popup("Style", _styleIndex, StyleLabels);
-            _customSize = EditorGUILayout.IntField("Size (0 = default)", _customSize);
-        }
-
-        _applyTitle = EditorGUILayout.TextField(new GUIContent("Title", "Empty = keep each object's current title"), _applyTitle);
-
-        EditorGUILayout.Space(2);
-        using (new EditorGUI.DisabledScope(count == 0))
-        {
-            Color prevBg = GUI.backgroundColor;
-            if (count > 0) GUI.backgroundColor = _accent;
-            if (GUILayout.Button("Apply banner (" + count + ")", GUILayout.Height(26)))
-                ApplyToSelection();
-            GUI.backgroundColor = prevBg;
-        }
-
-        EditorGUILayout.Space(4);
-        EditorGUILayout.LabelField("Recolor (keeps title + options)", EditorStyles.miniLabel);
-        DrawSwatchGrid(count);
-
-        EditorGUILayout.BeginHorizontal();
-        _freeRecolorColor = EditorGUILayout.ColorField(GUIContent.none, _freeRecolorColor, false, false, false, GUILayout.Width(50));
-        using (new EditorGUI.DisabledScope(count == 0))
-        {
-            if (GUILayout.Button("Recolor with custom", GUILayout.Height(20)))
-                RecolorSelection("#" + ColorUtility.ToHtmlStringRGB(_freeRecolorColor));
-        }
-        EditorGUILayout.EndHorizontal();
-    }
-
-    // Reloads the inline-editor fields from the currently selected object (if it's a single banner).
-    private void RefreshEditState()
-    {
-        _editValid = false;
-        _editTarget = null;
-        GameObject[] sel = Selection.gameObjects;
-        if (sel == null || sel.Length != 1 || sel[0] == null) return;
-
-        if (ChromarchyHeaders.TryParseEditable(sel[0].name, out ChromarchyHeaders.EditableBanner e) && e.m_valid)
-        {
-            _editValid = true;
-            _editTarget = sel[0];
-            _editTitle = e.m_title;
-            _editColorA = e.m_colorA;
-            _editGradient = e.m_hasGradient;
-            _editColorB = e.m_colorB;
-            _editVertical = e.m_vertical;
-            _editAlign = e.m_align;
-            _editStyle = e.m_style;
-            _editSize = e.m_size;
-            _editTextColor = e.m_textColor;
-        }
-    }
-
-    private void DrawSelectedBannerEditor()
-    {
-        // Selection can change between events without OnSelectionChange firing for the same object
-        // (e.g. the name was edited elsewhere); keep the target in sync defensively.
-        if (_editTarget != null && (Selection.gameObjects == null || Selection.gameObjects.Length != 1 || Selection.gameObjects[0] != _editTarget))
-            RefreshEditState();
-
-        if (!_editValid || _editTarget == null) return;
-
-        EditorGUILayout.LabelField("Edit selected banner", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField(new GUIContent("Raw: " + _editTarget.name, _editTarget.name), EditorStyles.miniLabel);
-
-        _editTitle = EditorGUILayout.TextField("Title", _editTitle);
-        _editColorA = EditorGUILayout.ColorField(_editGradient ? "Color 1" : "Color", _editColorA);
-        _editGradient = EditorGUILayout.ToggleLeft("Gradient", _editGradient);
-        if (_editGradient)
-        {
-            EditorGUI.indentLevel++;
-            _editColorB = EditorGUILayout.ColorField("Color 2", _editColorB);
-            _editVertical = EditorGUILayout.ToggleLeft("Vertical", _editVertical);
-            EditorGUI.indentLevel--;
-        }
-        _editTextColor = EditorGUILayout.ColorField("Text color", _editTextColor);
-        _editAlign = EditorGUILayout.Popup("Alignment", _editAlign, AlignLabels);
-        _editStyle = EditorGUILayout.Popup("Style", _editStyle, StyleLabels);
-        _editSize = EditorGUILayout.IntField("Size (0 = default)", _editSize);
-
-        EditorGUILayout.Space(2);
-        Color prevBg = GUI.backgroundColor;
-        GUI.backgroundColor = _accent;
-        if (GUILayout.Button("Apply changes", GUILayout.Height(24)))
-            ApplyEdit();
-        GUI.backgroundColor = prevBg;
-
-        Rect div = GUILayoutUtility.GetRect(0f, 8f, GUILayout.ExpandWidth(true));
-        EditorGUI.DrawRect(new Rect(div.x, div.y + 4f, div.width, 1f), new Color(1f, 1f, 1f, 0.08f));
-        EditorGUILayout.LabelField("Or apply a new banner to the selection:", EditorStyles.miniLabel);
-    }
-
-    private void ApplyEdit()
-    {
-        if (_editTarget == null) return;
-        Undo.RecordObject(_editTarget, "Chromarchy: edit banner");
-        _editTarget.name = BuildEditSpec() + "=" + _editTitle;
-        EditorUtility.SetDirty(_editTarget);
-        EditorApplication.RepaintHierarchyWindow();
-    }
-
-    private string BuildEditSpec()
-    {
-        string spec = "#" + ColorUtility.ToHtmlStringRGB(_editColorA);
-        if (_editGradient) spec += ">#" + ColorUtility.ToHtmlStringRGB(_editColorB);
-        if (_editAlign == 1) spec += " left";
-        else if (_editAlign == 2) spec += " right";
-        if (_editStyle == 1) spec += " normal";
-        else if (_editStyle == 2) spec += " italic";
-        else if (_editStyle == 3) spec += " bolditalic";
-        if (_editSize > 0) spec += " s" + _editSize;
-        if (_editGradient && _editVertical) spec += " vertical";
-        // Re-emit a non-white text color so editing it round-trips; white is the default, omit it.
-        if (_editTextColor != Color.white) spec += " text:#" + ColorUtility.ToHtmlStringRGB(_editTextColor);
-        return spec;
-    }
-
     private void DrawRgbSection()
     {
         EditorGUILayout.PropertyField(_so.FindProperty("m_rgbMode"), new GUIContent("Rainbow mode"));
@@ -504,97 +742,136 @@ public class ChromarchyWindow : EditorWindow
         EditorGUILayout.LabelField("Animated; tints non-banner rows. Editor-only.", EditorStyles.miniLabel);
     }
 
-    private void DrawSwatchGrid(int selectionCount)
+    private void DrawFolderColors()
     {
-        using (new EditorGUI.DisabledScope(selectionCount == 0))
+        bool en = EditorGUILayout.Toggle("Enable folder colors", _config.m_enableFolderColors);
+        if (en != _config.m_enableFolderColors)
         {
-            const int perRow = 5;
-            for (int i = 0; i < Swatches.Length; i++)
-            {
-                if (i % perRow == 0) EditorGUILayout.BeginHorizontal();
-
-                Color prev = GUI.backgroundColor;
-                GUI.backgroundColor = Swatches[i].m_color;
-                if (GUILayout.Button(Swatches[i].m_name, GUILayout.Height(22)))
-                    RecolorSelection(Swatches[i].m_name);
-                GUI.backgroundColor = prev;
-
-                if (i % perRow == perRow - 1 || i == Swatches.Length - 1) EditorGUILayout.EndHorizontal();
-            }
+            Undo.RecordObject(_config, "Chroma: toggle folder colors");
+            _config.m_enableFolderColors = en;
+            _config.m_version++;
+            EditorUtility.SetDirty(_config);
+            ChromarchyFolders.Invalidate();
+            EditorApplication.RepaintProjectWindow();
         }
-    }
 
-    private void DrawBookmarks()
-    {
-        int sel = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
-        using (new EditorGUI.DisabledScope(sel == 0))
-            if (GUILayout.Button("Bookmark selection (" + sel + ")"))
-                foreach (GameObject go in Selection.gameObjects)
-                    ChromarchyBookmarks.Add(go);
+        List<string> folders = SelectedFolderGuids();
+        EditorGUILayout.BeginHorizontal();
+        _folderPickColor = EditorGUILayout.ColorField(GUIContent.none, _folderPickColor, false, false, false, GUILayout.Width(50));
+        using (new EditorGUI.DisabledScope(folders.Count == 0))
+            if (GUILayout.Button("Color selected folder(s) (" + folders.Count + ")"))
+                foreach (string guid in folders)
+                    ChromarchyFolders.SetColor(guid, _folderPickColor);
+        EditorGUILayout.EndHorizontal();
 
-        IReadOnlyList<string> gids = ChromarchyBookmarks.Gids;
-        if (gids.Count == 0)
+        var list = _config.m_folderColors;
+        if (list == null || list.Count == 0)
         {
-            EditorGUILayout.LabelField("No bookmarks", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("No colored folders", EditorStyles.miniLabel);
             return;
         }
 
-        bool hasSearch = !string.IsNullOrWhiteSpace(_search);
-        // Mutate the bookmarks list after iteration to avoid corrupting GIDs while drawing.
-        string removeGid = null;
-        int moveFrom = -1, moveTo = -1;
-        GameObject jumpTarget = null;
-        int shown = 0;
-
-        for (int i = 0; i < gids.Count; i++)
+        for (int i = 0; i < list.Count; i++)
         {
-            string gid = gids[i];
-            GameObject go = ChromarchyBookmarks.ResolveGid(gid);
-            string label = go != null ? go.name : "(not in open scene)";
-
-            if (hasSearch && label.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
-            shown++;
+            ChromarchyConfig.FolderColor f = list[i];
+            if (f == null) continue;
+            string path = AssetDatabase.GUIDToAssetPath(f.m_guid);
+            string label = string.IsNullOrEmpty(path) ? "(missing folder)" : Path.GetFileName(path);
 
             EditorGUILayout.BeginHorizontal();
-
-            using (new EditorGUI.DisabledScope(hasSearch || i == 0))
-                if (GUILayout.Button("▲", GUILayout.Width(22), GUILayout.Height(18)))
-                {
-                    moveFrom = i; moveTo = i - 1;
-                }
-            using (new EditorGUI.DisabledScope(hasSearch || i == gids.Count - 1))
-                if (GUILayout.Button("▼", GUILayout.Width(22), GUILayout.Height(18)))
-                {
-                    moveFrom = i; moveTo = i + 1;
-                }
-
-            GUILayout.Label(label, _bookmarkRowStyle, GUILayout.ExpandWidth(true));
-            Rect labelRect = GUILayoutUtility.GetLastRect();
-            if (go != null
-                && Event.current.type == EventType.MouseDown
-                && Event.current.clickCount == 2
-                && labelRect.Contains(Event.current.mousePosition))
-            {
-                jumpTarget = go;
-                Event.current.Use();
-            }
-
-            using (new EditorGUI.DisabledScope(go == null))
-                if (GUILayout.Button("Go", GUILayout.Width(34)))
-                    jumpTarget = go;
+            EditorGUILayout.LabelField(label);
+            Color edited = EditorGUILayout.ColorField(GUIContent.none, f.m_color, false, false, false, GUILayout.Width(50));
+            if (edited != f.m_color)
+                ChromarchyFolders.SetColor(f.m_guid, edited);
             if (GUILayout.Button("X", GUILayout.Width(22)))
-                removeGid = gid;
-
+            {
+                ChromarchyFolders.SetColor(f.m_guid, null);
+                EditorGUILayout.EndHorizontal();
+                break;
+            }
             EditorGUILayout.EndHorizontal();
         }
+    }
 
-        if (hasSearch && shown == 0)
-            EditorGUILayout.LabelField("No bookmark matches '" + _search + "'", EditorStyles.miniLabel);
+    private List<string> SelectedFolderGuids()
+    {
+        var guids = new List<string>();
+        UnityEngine.Object[] objs = Selection.objects;
+        if (objs == null) return guids;
+        foreach (UnityEngine.Object o in objs)
+        {
+            string path = AssetDatabase.GetAssetPath(o);
+            if (!string.IsNullOrEmpty(path) && AssetDatabase.IsValidFolder(path))
+                guids.Add(AssetDatabase.AssetPathToGUID(path));
+        }
+        return guids;
+    }
 
-        if (jumpTarget != null) ChromarchyBookmarks.Jump(jumpTarget);
-        else if (moveFrom >= 0 && moveTo >= 0) ChromarchyBookmarks.Reorder(moveFrom, moveTo);
-        else if (removeGid != null) ChromarchyBookmarks.Remove(removeGid);
+    private void DrawThemes()
+    {
+        EditorGUILayout.LabelField("One click sets tree/separator colors + preset palette.", EditorStyles.miniLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Minimal")) ApplyTheme("minimal");
+        if (GUILayout.Button("Vibrant")) ApplyTheme("vibrant");
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Soft")) ApplyTheme("soft");
+        if (GUILayout.Button("High-contrast")) ApplyTheme("contrast");
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void ApplyTheme(string theme)
+    {
+        Undo.RecordObject(_config, "Chroma: apply theme");
+
+        switch (theme)
+        {
+            case "minimal":
+                _config.m_treeLineColor = new Color(1f, 1f, 1f, 0.10f);
+                _config.m_separatorColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+                _config.m_separatorFillColor = new Color(0.20f, 0.20f, 0.20f, 1f);
+                _config.m_separatorStyle = SeparatorStyle.Solid;
+                _config.m_presets = ThemePresets("#3a3f44", "#4a4f55", "#2c2f33", "#33363a", "#3a3f44>#2c2f33");
+                break;
+            case "vibrant":
+                _config.m_treeLineColor = new Color(0.40f, 0.70f, 1f, 0.25f);
+                _config.m_separatorColor = new Color(0.90f, 0.90f, 0.95f, 1f);
+                _config.m_separatorFillColor = new Color(0.16f, 0.17f, 0.22f, 1f);
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#1f6feb", "#e0457b", "#1ca672", "#f0883e", "#1f6feb>#7b2ff7");
+                break;
+            case "soft":
+                _config.m_treeLineColor = new Color(1f, 1f, 1f, 0.12f);
+                _config.m_separatorColor = new Color(0.75f, 0.72f, 0.80f, 1f);
+                _config.m_separatorFillColor = new Color(0.24f, 0.23f, 0.27f, 1f);
+                _config.m_separatorStyle = SeparatorStyle.Dotted;
+                _config.m_presets = ThemePresets("#6ea8fe", "#f4a6c0", "#8fd3b6", "#f6c08a", "#6ea8fe>#b9a3f0");
+                break;
+            case "contrast":
+                _config.m_treeLineColor = new Color(1f, 1f, 1f, 0.35f);
+                _config.m_separatorColor = Color.white;
+                _config.m_separatorFillColor = Color.black;
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#0a84ff", "#ff375f", "#30d158", "#ff9f0a", "#0a84ff>#bf5af2");
+                break;
+        }
+
+        _config.m_version++;
+        EditorUtility.SetDirty(_config);
+        _so.Update();
+        ChromarchyHeaders.OnConfigChanged(_config);
+    }
+
+    private static List<ChromarchyConfig.Preset> ThemePresets(string h1, string h2, string h3, string cat, string grad)
+    {
+        return new List<ChromarchyConfig.Preset>
+        {
+            new ChromarchyConfig.Preset { m_key = "h1",   m_spec = h1 + " center bold s12 text:white" },
+            new ChromarchyConfig.Preset { m_key = "h2",   m_spec = h2 + " left bold text:white" },
+            new ChromarchyConfig.Preset { m_key = "h3",   m_spec = h3 + " left italic text:white" },
+            new ChromarchyConfig.Preset { m_key = "cat",  m_spec = cat + " left bold text:white" },
+            new ChromarchyConfig.Preset { m_key = "grad", m_spec = grad + " center bold text:white" },
+        };
     }
 
     private void DrawPresets()
@@ -655,12 +932,13 @@ public class ChromarchyWindow : EditorWindow
 
     private void DrawFooter()
     {
+        EditorGUILayout.Space(4);
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Reset to defaults", GUILayout.Height(22)))
         {
-            if (EditorUtility.DisplayDialog("Chromarchy", "Reset the whole config?", "Yes", "Cancel"))
+            if (EditorUtility.DisplayDialog("Chroma", "Reset the whole config?", "Yes", "Cancel"))
             {
-                Undo.RecordObject(_config, "Reset Chromarchy Config");
+                Undo.RecordObject(_config, "Reset Chroma Config");
                 _config.ResetToDefaults();
                 _config.m_version++;
                 EditorUtility.SetDirty(_config);
@@ -676,66 +954,68 @@ public class ChromarchyWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Export config...", GUILayout.Height(22)))
-            ExportConfig();
-        if (GUILayout.Button("Import config...", GUILayout.Height(22)))
-            ImportConfig();
+        if (GUILayout.Button("Export config...", GUILayout.Height(22))) ExportConfig();
+        if (GUILayout.Button("Import config...", GUILayout.Height(22))) ImportConfig();
         EditorGUILayout.EndHorizontal();
     }
 
     private void ExportConfig()
     {
-        string path = EditorUtility.SaveFilePanel("Export Chromarchy config", "", "chromarchy-config.json", "json");
+        string path = EditorUtility.SaveFilePanel("Export Chroma config", "", "chroma-config.json", "json");
         if (string.IsNullOrEmpty(path)) return;
-        try
-        {
-            File.WriteAllText(path, JsonUtility.ToJson(_config, true));
-        }
-        catch (Exception ex)
-        {
-            EditorUtility.DisplayDialog("Chromarchy", "Export failed:\n" + ex.Message, "OK");
-        }
+        try { File.WriteAllText(path, JsonUtility.ToJson(_config, true)); }
+        catch (Exception ex) { EditorUtility.DisplayDialog("Chroma", "Export failed:\n" + ex.Message, "OK"); }
     }
 
     private void ImportConfig()
     {
-        string path = EditorUtility.OpenFilePanel("Import Chromarchy config", "", "json");
+        string path = EditorUtility.OpenFilePanel("Import Chroma config", "", "json");
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
         try
         {
             string json = File.ReadAllText(path);
-            Undo.RecordObject(_config, "Import Chromarchy config");
+            Undo.RecordObject(_config, "Import Chroma config");
             JsonUtility.FromJsonOverwrite(json, _config);
             _config.m_version++;
             EditorUtility.SetDirty(_config);
             _so.Update();
             ChromarchyHeaders.OnConfigChanged(_config);
         }
-        catch (Exception ex)
+        catch (Exception ex) { EditorUtility.DisplayDialog("Chroma", "Import failed:\n" + ex.Message, "OK"); }
+    }
+
+    #endregion
+
+
+    #region Tools and Utilities
+
+    private static void DrawGradientRect(Rect r, Color a, Color b, bool vertical)
+    {
+        const int n = 24;
+        for (int i = 0; i < n; i++)
         {
-            EditorUtility.DisplayDialog("Chromarchy", "Import failed:\n" + ex.Message, "OK");
+            float t = (i + 0.5f) / n;
+            Color c = Color.Lerp(a, b, t);
+            Rect seg = vertical
+                ? new Rect(r.x, r.y + r.height * (i / (float)n), r.width, r.height / n + 1f)
+                : new Rect(r.x + r.width * (i / (float)n), r.y, r.width / n + 1f, r.height);
+            EditorGUI.DrawRect(seg, c);
         }
     }
 
-    private string BuildSpec()
+    private static TextAnchor AlignAnchor(int i)
     {
-        if (_applyMode == ApplyMode.Preset)
-        {
-            if (_config.m_presets.Count == 0) return null;
-            _presetIndex = Mathf.Clamp(_presetIndex, 0, _config.m_presets.Count - 1);
-            return _config.m_presets[_presetIndex].m_key;
-        }
+        if (i == 1) return TextAnchor.MiddleLeft;
+        if (i == 2) return TextAnchor.MiddleRight;
+        return TextAnchor.MiddleCenter;
+    }
 
-        string spec = "#" + ColorUtility.ToHtmlStringRGB(_customColor);
-        if (_customGradient) spec += ">#" + ColorUtility.ToHtmlStringRGB(_customColor2);
-        if (_alignIndex == 1) spec += " left";
-        else if (_alignIndex == 2) spec += " right";
-        if (_styleIndex == 1) spec += " normal";
-        else if (_styleIndex == 2) spec += " italic";
-        else if (_styleIndex == 3) spec += " bolditalic";
-        if (_customSize > 0) spec += " s" + _customSize;
-        if (_customGradient && _customVertical) spec += " vertical";
-        return spec;
+    private static FontStyle FontStyleOf(int i)
+    {
+        if (i == 1) return FontStyle.Normal;
+        if (i == 2) return FontStyle.Italic;
+        if (i == 3) return FontStyle.BoldAndItalic;
+        return FontStyle.Bold;
     }
 
     private static string ExtractTitle(string name)
@@ -744,7 +1024,7 @@ public class ChromarchyWindow : EditorWindow
         return eq >= 0 ? name.Substring(eq + 1).Trim() : name;
     }
 
-    // Replaces the background of an existing name with colorToken, keeping title + other options.
+    // Replaces the background of a name with colorToken, keeping title + other options.
     private static string ReplaceColor(string name, string colorToken)
     {
         int eq = name.IndexOf('=');
@@ -761,8 +1041,8 @@ public class ChromarchyWindow : EditorWindow
 
     private static bool IsColorToken(string token)
     {
-        if (token.StartsWith("#")) return true;       // includes "#a>#b" gradients
-        if (token.IndexOf('>') > 0) return true;       // named-color gradient e.g. blue>orange
+        if (token.StartsWith("#")) return true;
+        if (token.IndexOf('>') > 0) return true;
         return NamedColors.Contains(token.ToLowerInvariant());
     }
 
@@ -771,6 +1051,8 @@ public class ChromarchyWindow : EditorWindow
 
     #region Private and Protected
 
+    private static readonly string[] _tabLabels = { "Selection", "Settings" };
+    private static readonly string[] _outputLabels = { "Name", "Component" };
     private static readonly string[] AlignLabels = { "Center", "Left", "Right" };
     private static readonly string[] StyleLabels = { "Bold", "Normal", "Italic", "BoldItalic" };
 
@@ -797,33 +1079,31 @@ public class ChromarchyWindow : EditorWindow
     private ChromarchyConfig _config;
     private SerializedObject _so;
     private Vector2 _scroll;
+    private Tab _tab;
 
-    private ApplyMode _applyMode = ApplyMode.Custom;
+    // Unified draft used by the Selection tab (pre-filled when editing an existing banner).
+    private OutputMode _outputMode = OutputMode.Name;
+    private string _dTitle = "";
+    private bool _dBackground = true;
+    private Color _dColor = new Color(0.15f, 0.45f, 0.90f);
+    private bool _dGradient;
+    private Color _dColor2 = new Color(0.48f, 0.18f, 0.91f);
+    private bool _dVertical;
+    private Color _dTextColor = Color.white;
+    private int _dAlign;
+    private int _dStyle;
+    private int _dSize;
+
+    private SelSource _selSource;
+    private GameObject _selObject;
+    private string _selOriginalSpec = "";
+    private GameObject _selEvaluatedFor;
+    private string _selEvaluatedName;
+
     private int _presetIndex;
-    private Color _customColor = new Color(0.15f, 0.45f, 0.90f);
-    private bool _customGradient;
-    private Color _customColor2 = new Color(0.48f, 0.18f, 0.91f);
-    private bool _customVertical;
-    private int _alignIndex;
-    private int _styleIndex;
-    private int _customSize;
-    private string _applyTitle = "";
-
     private Color _freeRecolorColor = new Color(0.30f, 0.60f, 0.90f);
+    private Color _folderPickColor = new Color(0.30f, 0.55f, 1f);
     private string _search = "";
-
-    // Inline editor state for the single selected banner.
-    private bool _editValid;
-    private GameObject _editTarget;
-    private string _editTitle = "";
-    private Color _editColorA = new Color(0.15f, 0.45f, 0.90f);
-    private bool _editGradient;
-    private Color _editColorB = new Color(0.48f, 0.18f, 0.91f);
-    private bool _editVertical;
-    private int _editAlign;
-    private int _editStyle;
-    private int _editSize;
-    private Color _editTextColor = Color.white;
 
     private readonly Dictionary<string, AnimBool> _anims = new Dictionary<string, AnimBool>();
 
@@ -832,11 +1112,13 @@ public class ChromarchyWindow : EditorWindow
     private GUIStyle _sectionStyle;
     private GUIStyle _cardBody;
     private GUIStyle _bookmarkRowStyle;
+    private GUIStyle _previewStyle;
     private Color _accent;
     private Color _accentDim;
     private Color _headerBarColor;
     private Color _sectionHeaderBg;
     private Color _sectionHeaderHover;
+    private Color _previewMaskColor;
     private bool _sectionShown;
     private bool _stylesBuilt;
 

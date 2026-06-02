@@ -24,15 +24,29 @@ public class ChromarchyBuildStripper : IProcessSceneWithReport
     {
         // OnProcessScene fires on play mode entry too — `report` is null in that case.
         if (report == null) return;
-        if (!ShouldStrip()) return;
 
-        int count = 0;
         GameObject[] roots = scene.GetRootGameObjects();
-        for (int i = 0; i < roots.Length; i++)
-            count += StripRecursive(roots[i].transform);
 
-        if (count > 0)
-            Debug.Log($"Chromarchy: stripped {count} banner name(s) from '{scene.name}'.");
+        // ChromaBanner is pure Editor decoration — always remove it from built scenes.
+        int comps = 0;
+        for (int i = 0; i < roots.Length; i++)
+        {
+            ChromaBanner[] banners = roots[i].GetComponentsInChildren<ChromaBanner>(true);
+            for (int b = 0; b < banners.Length; b++)
+            {
+                Object.DestroyImmediate(banners[b]);
+                comps++;
+            }
+        }
+
+        // Name specs are stripped only when the user opts in.
+        int names = 0;
+        if (ShouldStrip())
+            for (int i = 0; i < roots.Length; i++)
+                names += StripRecursive(roots[i].transform);
+
+        if (comps > 0 || names > 0)
+            Debug.Log($"Chroma: stripped {names} banner name(s) and {comps} component(s) from '{scene.name}'.");
     }
 
     #endregion

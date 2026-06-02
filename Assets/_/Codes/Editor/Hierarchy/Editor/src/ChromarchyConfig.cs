@@ -20,6 +20,13 @@ public class ChromarchyConfig : ScriptableObject
     }
 
     [System.Serializable]
+    public class FolderColor
+    {
+        public string m_guid;
+        public Color m_color = new Color(0.30f, 0.55f, 1f);
+    }
+
+    [System.Serializable]
     public class AutoColorRule
     {
         public bool m_enabled = true;
@@ -46,6 +53,15 @@ public class ChromarchyConfig : ScriptableObject
     public bool m_enableTreeLines = true;
     public Color m_treeLineColor = new Color(1f, 1f, 1f, 0.15f);
 
+    [Header("Row extras")]
+    public bool m_showChildCount = false;
+    public bool m_zebra = false;
+    public Color m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
+
+    [Header("Folder colors (Project window)")]
+    public bool m_enableFolderColors = true;
+    public List<FolderColor> m_folderColors = new List<FolderColor>();
+
     [Header("Separators")]
     public bool m_enableSeparators = true;
     public Color m_separatorColor = new Color(0.5f, 0.5f, 0.5f, 1f);
@@ -65,7 +81,7 @@ public class ChromarchyConfig : ScriptableObject
     public List<AutoColorRule> m_autoColorRules = new List<AutoColorRule>();
 
     [Header("Build")]
-    [Tooltip("Strip Chromarchy specs from GameObject names in built scenes ('#1f6feb center bold=Title' becomes 'Title'). Scene assets on disk are not modified.")]
+    [Tooltip("Strip Chroma specs from GameObject names in built scenes ('#1f6feb center bold=Title' becomes 'Title'). Scene assets on disk are not modified.")]
     public bool m_stripNamesInBuild = true;
 
     [Header("RGB mode")]
@@ -105,6 +121,13 @@ public class ChromarchyConfig : ScriptableObject
 
         m_enableTreeLines = true;
         m_treeLineColor = new Color(1f, 1f, 1f, 0.15f);
+
+        m_showChildCount = false;
+        m_zebra = false;
+        m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
+
+        m_enableFolderColors = true;
+        m_folderColors = new List<FolderColor>();
 
         m_enableSeparators = true;
         m_separatorColor = new Color(0.5f, 0.5f, 0.5f, 1f);

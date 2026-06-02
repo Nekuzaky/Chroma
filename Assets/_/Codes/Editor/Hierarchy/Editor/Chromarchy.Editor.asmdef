@@ -1,5 +1,8 @@
 {
     "name": "Chromarchy.Editor",
+    "references": [
+        "Chroma.Runtime"
+    ],
     "includePlatforms": [
         "Editor"
     ]
