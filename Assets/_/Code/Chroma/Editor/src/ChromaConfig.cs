@@ -64,6 +64,12 @@ public class ChromaConfig : ScriptableObject
     [Tooltip("Show colored banners when GameObject names contain #color codes")]
     public bool m_enableHeaders = true;
 
+    [Header("Banner font")]
+    [Tooltip("Custom Font asset for banner & separator text. Overrides the system font below when set; leave empty to use a system font or the editor default")]
+    public Font m_bannerFont;
+    [Tooltip("Name of an installed system font for banner & separator text (pick it in Tools > Chroma > Settings > Font). Empty = editor default")]
+    public string m_bannerFontName = "";
+
     [Header("Tree lines")]
     [Tooltip("File explorer style connector lines in the hierarchy indent gutter")]
     public bool m_enableTreeLines = true;
@@ -77,6 +83,8 @@ public class ChromaConfig : ScriptableObject
     public bool m_zebra = false;
     [Tooltip("Color for zebra striped rows")]
     public Color m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
+    [Tooltip("Show a warning icon on rows whose GameObject has a missing (deleted) script component")]
+    public bool m_warnMissingScripts = true;
 
     [Header("Folder colors (Project window)")]
     [Tooltip("Enable color tinting for folders in the Project window")]
@@ -194,11 +202,14 @@ public class ChromaConfig : ScriptableObject
     public void ResetToDefaults()
     {
         m_enableHeaders = true;
+        m_bannerFont = null;
+        m_bannerFontName = "";
         m_enableTreeLines = true;
         m_treeLineColor = new Color(1f, 1f, 1f, 0.15f);
         m_showChildCount = false;
         m_zebra = false;
         m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
+        m_warnMissingScripts = true;
         m_enableFolderColors = true;
         m_folderColors = new List<FolderColor>();
         m_enableSeparators = true;

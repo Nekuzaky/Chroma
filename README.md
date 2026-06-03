@@ -12,10 +12,11 @@ auto-coloring rules and more, with **zero runtime cost**.
   - **By component**: add a `ChromaBanner` component (separate Background / Font / Title fields) so the
     GameObject keeps its real name.
 - **Separators** — name an object `--- Label` (solid / dashed / dotted / double line styles).
+- **Custom banner font** — use a Font asset or any installed system font (Sans / Serif / Mono / Comic quick-picks).
 - **Tree guide lines** in the indent gutter.
 - **Auto-color rules** — tint rows by Tag, Layer, name prefix or regex.
 - **Child-color inheritance** (flat or depth-fade).
-- **Child count `(N)`**, **zebra striping**, and **bookmarks** (jump & reorder).
+- **Child count `(N)`**, **zebra striping**, **missing-script warnings**, and **bookmarks** (jump & reorder).
 - **Animated RGB mode** for hierarchy rows and Project-window folders.
 - **Project-window folder colors**.
 - **Themes** and reusable **banner presets**.
@@ -30,8 +31,16 @@ auto-coloring rules and more, with **zero runtime cost**.
 
 ## Installation
 
-Copy the `Assets/_/Codes/Chroma` folder into your project's `Assets`. It is self-contained, with its own
-assembly definitions (`Chroma.Runtime`, `Chroma.Editor`).
+**Via Package Manager (git URL)** — in Unity open *Window ▸ Package Manager ▸ + ▸ Add package from git URL…*
+and paste:
+
+```
+https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/Chroma
+```
+
+**Or copy the folder** — drop `Assets/_/Code/Chroma` into your project's `Assets`.
+
+Either way it is self-contained, with its own assembly definitions (`Chroma.Runtime`, `Chroma.Editor`).
 
 ## Usage
 
@@ -46,10 +55,11 @@ assembly definitions (`Chroma.Runtime`, `Chroma.Editor`).
 ## Project structure
 
 ```
-Assets/_/Codes/Chroma/
-  Runtime/   # ChromaBanner component        (Chroma.Runtime asmdef, all platforms)
-  Editor/    # Hierarchy & Project drawers, window, config (Chroma.Editor asmdef, Editor-only)
-  Tests/     # EditMode tests                 (Chroma.Editor.Tests asmdef)
+Assets/_/Code/Chroma/
+  package.json  # UPM package manifest (com.nekuzaky.chroma)
+  Runtime/      # ChromaBanner component        (Chroma.Runtime asmdef, all platforms)
+  Editor/       # Hierarchy & Project drawers, window, config (Chroma.Editor asmdef, Editor-only)
+  Tests/        # EditMode tests                 (Chroma.Editor.Tests asmdef)
 ```
 
 ## License

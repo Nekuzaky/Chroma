@@ -2,6 +2,6 @@
   <Project Path="Chroma.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Chroma.Editor.Tests.csproj" />
-  <Project Path="Chroma.Runtime.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Chroma.Runtime.csproj" />
 </Solution>

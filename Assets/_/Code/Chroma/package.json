@@ -1,0 +1,23 @@
+{
+  "name": "com.nekuzaky.chroma",
+  "version": "0.1.0",
+  "displayName": "Chroma",
+  "description": "Editor-only Unity extension that color-codes the Hierarchy and Project window: colored banners, gradients, separators, tree guide lines, auto-color rules, child-color inheritance, bookmarks, animated RGB mode, themes, custom banner fonts, missing-script warnings and build-time stripping. Zero runtime cost.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Nekuzaky",
+    "url": "https://github.com/Nekuzaky"
+  },
+  "keywords": [
+    "hierarchy",
+    "project-window",
+    "editor",
+    "color",
+    "organization",
+    "productivity",
+    "workflow"
+  ],
+  "documentationUrl": "https://github.com/Nekuzaky/Chroma",
+  "changelogUrl": "https://github.com/Nekuzaky/Chroma/releases",
+  "licensesUrl": "https://github.com/Nekuzaky/Chroma"
+}

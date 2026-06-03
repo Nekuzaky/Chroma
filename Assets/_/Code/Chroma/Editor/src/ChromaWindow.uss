@@ -1,0 +1,179 @@
+/* Chroma editor window — modern UI Toolkit chrome. */
+
+.chroma-header {
+    background-color: rgb(35, 39, 47);
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-bottom-width: 2px;
+    border-bottom-color: rgb(69, 133, 255);
+}
+
+.chroma-titlerow {
+    flex-direction: row;
+    align-items: center;
+}
+
+.chroma-logo {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    margin-right: 10px;
+    background-color: rgb(69, 133, 255);
+}
+
+.chroma-title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+}
+
+.chroma-sub {
+    font-size: 10px;
+    margin-top: 1px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.chroma-search {
+    margin-top: 8px;
+    border-radius: 6px;
+}
+
+.chroma-tabbar {
+    flex-direction: row;
+    padding-top: 6px;
+    padding-bottom: 4px;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.chroma-tab {
+    flex-grow: 1;
+    height: 26px;
+    margin-left: 3px;
+    margin-right: 3px;
+    border-width: 0;
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0);
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: 0.12s;
+}
+
+.chroma-tab:hover {
+    background-color: rgba(127, 127, 127, 0.18);
+}
+
+.chroma-tab--active {
+    background-color: rgb(69, 133, 255);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+}
+
+.chroma-content {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-bottom: 8px;
+    padding-top: 4px;
+}
+
+/* --- Native Selection tab --- */
+
+.chroma-card {
+    background-color: rgba(127, 127, 127, 0.08);
+    border-radius: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-bottom: 6px;
+}
+
+.chroma-hint {
+    font-size: 10px;
+    white-space: normal;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    color: rgba(127, 127, 127, 0.95);
+}
+
+.chroma-preview {
+    height: 38px;
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+
+.chroma-indent {
+    margin-left: 12px;
+}
+
+.chroma-storerow {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.chroma-storelabel {
+    width: 120px;
+}
+
+.chroma-seg {
+    flex-grow: 1;
+    height: 22px;
+    margin-left: 2px;
+    margin-right: 2px;
+    border-width: 0;
+    border-radius: 5px;
+    background-color: rgba(127, 127, 127, 0.15);
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: 0.1s;
+}
+
+.chroma-seg:hover {
+    background-color: rgba(127, 127, 127, 0.28);
+}
+
+.chroma-seg--active {
+    background-color: rgb(69, 133, 255);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+}
+
+.chroma-apply {
+    height: 30px;
+    margin-top: 8px;
+    border-width: 0;
+    border-radius: 6px;
+    background-color: rgb(69, 133, 255);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+}
+
+.chroma-apply:hover {
+    background-color: rgb(90, 150, 255);
+}
+
+.chroma-apply:disabled {
+    background-color: rgba(127, 127, 127, 0.25);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Native Settings foldouts --- */
+
+.chroma-fold {
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+.chroma-fold > .unity-foldout__toggle > .unity-toggle__input > .unity-label {
+    -unity-font-style: bold;
+}
+
+.chroma-fold-body {
+    padding-top: 4px;
+    padding-bottom: 6px;
+    padding-left: 4px;
+    padding-right: 4px;
+}

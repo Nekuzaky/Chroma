@@ -30,13 +30,17 @@ FEATURES
 
 • Separators — Create visual dividers by naming objects "---" or "___"
 
+• Custom Banner Font — Use a Font asset or any installed system font
+  (Sans / Serif / Mono / Comic quick-picks) for banner & separator text
+
 • Tree Guide Lines — File explorer style connector lines in the indent gutter
 
 • Auto-Color Rules — Tint rows by Tag, Layer, name prefix, or regex pattern
 
 • Child Color Inheritance — Children inherit colors from parent banners (flat or depth-fade)
 
-• Display Extras — Child count "(N)", zebra striping, bookmarks (jump & reorder)
+• Display Extras — Child count "(N)", zebra striping, missing-script warnings,
+  bookmarks (jump & reorder)
 
 • Project Window — Color folders in the Project window
 
@@ -54,14 +58,18 @@ Self-contained with assembly definitions (Chroma.Runtime, Chroma.Editor).
 
 INSTALLATION UPDATE
 -------------------
+Install via Unity Package Manager (recommended):
+  Window > Package Manager > + > Add package from git URL...
+  https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/Chroma
 
 
 FILE STRUCTURE
 --------------
 Assets/_/Code/Chroma/
-  Runtime/   ChromaBanner component (all platforms, Editor-only at runtime)
-  Editor/    Hierarchy/Project drawers, window, config (Editor-only)
-  Tests/     EditMode tests
+  package.json  UPM package manifest (com.nekuzaky.chroma)
+  Runtime/      ChromaBanner component (all platforms, Editor-only at runtime)
+  Editor/       Hierarchy/Project drawers, window, config (Editor-only)
+  Tests/        EditMode tests
 
 
 DOCUMENTATION

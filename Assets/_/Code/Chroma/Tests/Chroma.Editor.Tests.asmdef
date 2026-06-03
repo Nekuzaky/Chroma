@@ -4,7 +4,8 @@
     "references": [
         "Chroma.Editor",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Chroma.Runtime"
     ],
     "includePlatforms": [
         "Editor"
