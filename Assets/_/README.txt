@@ -4,23 +4,6 @@ CHROMA 0.0.2
 Editor-only Unity extension that color-codes your Hierarchy and Project folders
 so large scenes stay readable — with zero runtime cost.
 
-QUICK START
------------
-1. Open Tools > Chroma
-
-2. Select a GameObject and:
-   - Choose a color and style in the panel
-   - Click "Apply banner" (stores in name) or "Add component"
-
-3. See it colored in the Hierarchy instantly
-
-Done! Customize more in Settings tab (tree lines, separators, themes, etc.)
-
-
-REQUIREMENTS
-------------
-• Unity 2021.3 LTS or newer (developed on Unity 6)
-• Editor-only — no runtime impact
 
 FEATURES
 --------
@@ -47,13 +30,29 @@ FEATURES
 • Build Stripping — Banners are removed from built scenes (zero runtime footprint)
 
 
+QUICK START
+-----------
+1. Open Tools > Chroma
+
+2. Select a GameObject and:
+   - Choose a color and style in the panel
+   - Click "Apply banner" (stores in name) or "Add component"
+
+3. See it colored in the Hierarchy instantly
+
+Done! Customize more in Settings tab (tree lines, separators, themes, etc.)
+
+
+REQUIREMENTS
+------------
+• Unity 2021.3 LTS or newer (developed on Unity 6)
+• Editor-only — no runtime impact
+
+
 INSTALLATION
 ------------
-Copy Assets/_/Code/Chroma into your project's Assets folder if you want.
+Copy Assets/_/Code/Chroma into your project's Assets folder.
 Self-contained with assembly definitions (Chroma.Runtime, Chroma.Editor).
-
-INSTALLATION UPDATE
--------------------
 
 
 FILE STRUCTURE
@@ -64,14 +63,43 @@ Assets/_/Code/Chroma/
   Tests/     EditMode tests
 
 
+UPDATING CHROMA
+---------------
+Your config is ALWAYS preserved when updating. Here's how:
+
+1. AUTOMATIC MIGRATION (Safe)
+   - Each new version runs automatic migrations on old configs
+   - Your settings, presets, folder colors, and rules stay intact
+   - New features get sensible defaults, old ones never disappear
+
+2. BACKUP YOUR CONFIG (Optional)
+   - Tools > Chroma > Settings tab > Export config...
+   - Saves as chroma-config.json (human-readable)
+   - Keep this file safe before major updates
+
+3. RESTORE IF NEEDED
+   - Tools > Chroma > Settings tab > Import config...
+   - Select the exported JSON file
+   - Your old config is restored instantly
+
+WHAT NEVER BREAKS
+- Your colored banners (names and components)
+- Your folder colors
+- Your auto-color rules
+- Your custom presets
+- Your theme choices
+
+TIP: If something looks wrong after an update, check the console for warnings.
+
+
 DOCUMENTATION
 -------------
 For detailed information on banner syntax, presets, and configuration,
 see the README.md file or visit the Chroma settings panel in Unity.
 
 
-IF YOU FIND A BUG
------------------
-Please report it on contact@nekuzaky.com or https://www.nekuzaky.com/contact
+LICENSE
+-------
+No license file yet — all rights reserved by the repository owner.
 
 ================================================================================

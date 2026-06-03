@@ -154,9 +154,36 @@ public class ChromaConfig : ScriptableObject
 
     private void OnValidate()
     {
+        // Migrate old configs to new versions without data loss.
+        MigrateIfNeeded();
         // Catches direct Inspector edits (the window already calls OnConfigChanged explicitly).
         ChromaHeaders.OnConfigChanged(this);
     }
+
+    #endregion
+
+
+    #region Migration
+
+    /// <summary>Run migrations if this config is older than the current version.</summary>
+    private void MigrateIfNeeded()
+    {
+        const int CURRENT_VERSION = 1;
+        if (m_version >= CURRENT_VERSION) return;
+
+        // Future migrations go here:
+        // if (m_version < 2) MigrateV1ToV2();
+        // if (m_version < 3) MigrateV2ToV3();
+
+        m_version = CURRENT_VERSION;
+    }
+
+    /// <summary>Example: Add new fields with sensible defaults, keep old ones intact.</summary>
+    // private void MigrateV1ToV2()
+    // {
+    //     // New feature: m_newSetting ??= defaultValue;
+    //     // Old features remain untouched, so user config is preserved.
+    // }
 
     #endregion
 
