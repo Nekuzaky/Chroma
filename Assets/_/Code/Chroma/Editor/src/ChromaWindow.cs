@@ -39,6 +39,7 @@ public class ChromaWindow : EditorWindow
             RefreshSelectionUI();
         }
         _selExtras?.MarkDirtyRepaint();
+        RepaintSettings(); // e.g. Folder colors' "Color selected folder(s)" depends on the Project selection
     }
 
     /// <summary>
