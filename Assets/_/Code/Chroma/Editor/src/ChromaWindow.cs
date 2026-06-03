@@ -7,8 +7,11 @@ using UnityEngine;
 
 namespace Chroma.Editor
 {
-// Chroma control panel. Open via Tools/Chroma or GameObject/Chroma/Open Window.
-// Two tabs: "Selection" (everything about the selected object) and "Settings" (global config).
+/// <summary>
+/// Chroma editor control panel. Two tabs: Selection (banner editor for the selected object)
+/// and Settings (global Chroma configuration, rules, presets, RGB mode, themes).
+/// Open via Tools > Chroma or right-click GameObject > Chroma > Open Window.
+/// </summary>
 public class ChromaWindow : EditorWindow
 {
     private enum Tab { Selection, Settings }
@@ -55,6 +58,7 @@ public class ChromaWindow : EditorWindow
 
     #region Main API
 
+    /// <summary>Opens the Chroma editor window. Accessible from Tools > Chroma menu.</summary>
     [MenuItem("Tools/Chroma")]
     private static void Open()
     {
@@ -67,52 +71,58 @@ public class ChromaWindow : EditorWindow
 
     #region Chrome (header, tabs, sections)
 
+    /// <summary>Build cached GUIStyles and color constants on first layout pass.</summary>
     private void EnsureStyles()
     {
         if (_stylesBuilt) return;
         bool pro = EditorGUIUtility.isProSkin;
 
-        _titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
+        _titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 16, alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
         _titleStyle.normal.textColor = Color.white;
-        _subTitleStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft };
-        _subTitleStyle.normal.textColor = new Color(1f, 1f, 1f, 0.55f);
+        _titleStyle.padding = new RectOffset(4, 4, 4, 4);
 
-        _sectionStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12, alignment = TextAnchor.MiddleLeft };
-        _sectionStyle.normal.textColor = pro ? new Color(0.85f, 0.87f, 0.92f) : new Color(0.15f, 0.16f, 0.20f);
+        _subTitleStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft, fontSize = 10 };
+        _subTitleStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
 
-        _cardBody = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(8, 8, 8, 8) };
+        _sectionStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
+        _sectionStyle.normal.textColor = pro ? new Color(0.90f, 0.92f, 0.95f) : new Color(0.10f, 0.12f, 0.18f);
+        _sectionStyle.padding = new RectOffset(6, 6, 4, 4);
+
+        _cardBody = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(10, 10, 10, 10), margin = new RectOffset(0, 0, 2, 2) };
         _bookmarkRowStyle = new GUIStyle(EditorStyles.label);
-        _previewStyle = new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleCenter };
+        _previewStyle = new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleCenter, fontSize = 11 };
 
         _accent = new Color(0.27f, 0.52f, 1f);
         _accentDim = new Color(0.45f, 0.30f, 0.85f);
-        _headerBarColor = new Color(0.16f, 0.18f, 0.22f);
-        _sectionHeaderBg = pro ? new Color(0.25f, 0.27f, 0.31f) : new Color(0.74f, 0.76f, 0.81f);
-        _sectionHeaderHover = pro ? new Color(0.30f, 0.33f, 0.38f) : new Color(0.80f, 0.82f, 0.88f);
+        _headerBarColor = new Color(0.14f, 0.16f, 0.20f);
+        _sectionHeaderBg = pro ? new Color(0.22f, 0.25f, 0.29f) : new Color(0.76f, 0.78f, 0.84f);
+        _sectionHeaderHover = pro ? new Color(0.28f, 0.31f, 0.36f) : new Color(0.82f, 0.84f, 0.90f);
         _previewMaskColor = pro ? new Color(0.219f, 0.219f, 0.219f) : new Color(0.784f, 0.784f, 0.784f);
 
         _stylesBuilt = true;
     }
 
+    /// <summary>Draw the top banner with Chroma title, description, and search field.</summary>
     private void DrawHeaderBar()
     {
-        Rect r = GUILayoutUtility.GetRect(0f, 60f, GUILayout.ExpandWidth(true));
+        Rect r = GUILayoutUtility.GetRect(0f, 70f, GUILayout.ExpandWidth(true));
         EditorGUI.DrawRect(r, _headerBarColor);
 
-        EditorGUI.DrawRect(new Rect(r.x + 12f, r.y + 9f, 14f, 14f), _accent);
-        EditorGUI.DrawRect(new Rect(r.x + 16f, r.y + 13f, 14f, 14f), _accentDim);
+        EditorGUI.DrawRect(new Rect(r.x + 14f, r.y + 10f, 12f, 12f), _accent);
+        EditorGUI.DrawRect(new Rect(r.x + 18f, r.y + 14f, 12f, 12f), _accentDim);
 
-        GUI.Label(new Rect(r.x + 38f, r.y + 5f, r.width - 50f, 18f), "Chroma", _titleStyle);
-        GUI.Label(new Rect(r.x + 38f, r.y + 21f, r.width - 50f, 14f), "Color-code your hierarchy", _subTitleStyle);
+        GUI.Label(new Rect(r.x + 40f, r.y + 8f, r.width - 50f, 20f), "Chroma", _titleStyle);
+        GUI.Label(new Rect(r.x + 40f, r.y + 24f, r.width - 50f, 14f), "Editor hierarchy & folder colors", _subTitleStyle);
 
-        Rect searchRect = new Rect(r.x + 12f, r.y + 38f, r.width - 24f, 18f);
+        Rect searchRect = new Rect(r.x + 14f, r.y + 42f, r.width - 28f, 18f);
         _search = EditorGUI.TextField(searchRect, _search, EditorStyles.toolbarSearchField);
 
         float half = r.width * 0.5f;
-        EditorGUI.DrawRect(new Rect(r.x, r.yMax - 2f, half, 2f), _accent);
-        EditorGUI.DrawRect(new Rect(r.x + half, r.yMax - 2f, r.width - half, 2f), _accentDim);
+        EditorGUI.DrawRect(new Rect(r.x, r.yMax - 3f, half, 3f), _accent);
+        EditorGUI.DrawRect(new Rect(r.x + half, r.yMax - 3f, r.width - half, 3f), _accentDim);
     }
 
+    /// <summary>Draw the Selection / Settings tab buttons.</summary>
     private void DrawTabBar()
     {
         int t = GUILayout.Toolbar((int)_tab, _tabLabels, GUILayout.Height(24));
@@ -124,6 +134,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Get or create a cached AnimBool for animating section foldouts.</summary>
     private AnimBool GetAnim(string key, bool initial)
     {
         if (_anims.TryGetValue(key, out AnimBool anim)) return anim;
@@ -133,20 +144,21 @@ public class ChromaWindow : EditorWindow
         return anim;
     }
 
-    // Foldable card section: custom header strip (accent + triangle + hover) and an animated,
-    // padded body. Open state persisted in EditorPrefs. Returns true when the body should draw.
+    /// <summary>Begin a foldable section with animated collapse/expand. Persists open state in EditorPrefs.</summary>
     private bool BeginSection(string title, string key)
     {
-        EditorGUILayout.Space(4);
+        EditorGUILayout.Space(6);
         string prefKey = "Chroma.Fold." + key;
         bool open = EditorPrefs.GetBool(prefKey, true);
 
-        Rect rect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
+        Rect rect = GUILayoutUtility.GetRect(0f, 26f, GUILayout.ExpandWidth(true));
         bool hover = rect.Contains(Event.current.mousePosition);
         EditorGUI.DrawRect(rect, hover ? _sectionHeaderHover : _sectionHeaderBg);
-        EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), open ? _accent : _accentDim);
-        GUI.Label(new Rect(rect.x + 12f, rect.y, rect.width - 14f, rect.height),
-            (open ? "▾  " : "▸  ") + title, _sectionStyle);
+        EditorGUI.DrawRect(new Rect(rect.x, rect.y, 4f, rect.height), open ? _accent : _accentDim);
+
+        string triangle = open ? "▼" : "▶";
+        GUI.Label(new Rect(rect.x + 14f, rect.y + 1f, 20f, rect.height), triangle, _sectionStyle);
+        GUI.Label(new Rect(rect.x + 34f, rect.y, rect.width - 40f, rect.height), title, _sectionStyle);
 
         if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
         {
@@ -165,6 +177,7 @@ public class ChromaWindow : EditorWindow
         return _sectionShown;
     }
 
+    /// <summary>End a foldable section (closes the animated fade group and container).</summary>
     private void EndSection()
     {
         if (_sectionShown) EditorGUILayout.EndVertical();
@@ -177,21 +190,25 @@ public class ChromaWindow : EditorWindow
 
     #region Selection tab
 
+    /// <summary>Draw the Selection tab: banner editor for the selected GameObject(s).</summary>
     private void DrawSelectionTab()
     {
         SyncSelection();
         int count = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
 
         EditorGUILayout.BeginVertical(_cardBody);
+        EditorGUILayout.LabelField("Edit colors & styles for selected object(s)", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
 
-        // Context line.
+        // Context line with icon.
         string status;
-        if (count == 0) status = "Nothing selected";
-        else if (count > 1) status = count + " objects selected — new banner";
-        else if (_selSource == SelSource.Component) status = "Editing  " + _selObject.name + "   • component";
-        else if (_selSource == SelSource.NameBanner) status = "Editing  " + _selObject.name + "   • name banner";
-        else status = _selObject.name + "   • new banner";
+        if (count == 0) status = "⚪ Nothing selected";
+        else if (count > 1) status = "📦 " + count + " objects selected — new banner";
+        else if (_selSource == SelSource.Component) status = "🔧 Editing " + _selObject.name + " (component)";
+        else if (_selSource == SelSource.NameBanner) status = "✏️ Editing " + _selObject.name + " (name)";
+        else status = "➕ New banner for " + _selObject.name;
         EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
+        EditorGUILayout.Space(2);
 
         DrawPreview();
         EditorGUILayout.Space(6);
@@ -232,7 +249,7 @@ public class ChromaWindow : EditorWindow
                 : "   Encodes the style in the object's name.",
             EditorStyles.miniLabel);
 
-        EditorGUILayout.Space(6);
+        EditorGUILayout.Space(4);
         bool nameEditing = count == 1 && _selSource == SelSource.NameBanner;
         using (new EditorGUI.DisabledScope(count == 0))
         {
@@ -274,28 +291,35 @@ public class ChromaWindow : EditorWindow
         EndSection();
     }
 
+    /// <summary>Draw a live preview of the banner with the current draft settings.</summary>
     private void DrawPreview()
     {
-        Rect r = GUILayoutUtility.GetRect(0f, 28f, GUILayout.ExpandWidth(true));
+        EditorGUILayout.Space(2);
+        Rect r = GUILayoutUtility.GetRect(0f, 36f, GUILayout.ExpandWidth(true));
+
+        // Rounded corners effect with border
+        EditorGUI.DrawRect(r, new Color(0, 0, 0, 0.1f)); // slight border
 
         if (!_dBackground)
-            EditorGUI.DrawRect(r, _previewMaskColor);
+            EditorGUI.DrawRect(new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4), _previewMaskColor);
         else if (_dGradient)
-            DrawGradientRect(r, _dColor, _dColor2, _dVertical);
+            DrawGradientRect(new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4), _dColor, _dColor2, _dVertical);
         else
-            EditorGUI.DrawRect(r, _dColor);
+            EditorGUI.DrawRect(new Rect(r.x + 2, r.y + 2, r.width - 4, r.height - 4), _dColor);
 
         _previewStyle.alignment = AlignAnchor(_dAlign);
         _previewStyle.fontStyle = FontStyleOf(_dStyle);
-        _previewStyle.fontSize = _dSize > 0 ? Mathf.Min(_dSize, 18) : 12; // clamp so it fits the preview row
+        _previewStyle.fontSize = _dSize > 0 ? Mathf.Min(_dSize, 18) : 12;
         _previewStyle.normal.textColor = _dTextColor;
 
         string txt = !string.IsNullOrEmpty(_dTitle) ? _dTitle
             : (_selObject != null ? _selObject.name : "Preview");
-        Rect tr = new Rect(r.x + 6f, r.y, r.width - 12f, r.height);
+        Rect tr = new Rect(r.x + 8f, r.y + 2, r.width - 16f, r.height - 4);
         GUI.Label(tr, txt, _previewStyle);
+        EditorGUILayout.Space(2);
     }
 
+    /// <summary>Draw quick color swatch buttons to recolor the selected object(s).</summary>
     private void DrawRecolor(int count)
     {
         EditorGUILayout.LabelField("Recolors the selection (name banner or component).", EditorStyles.miniLabel);
@@ -324,26 +348,12 @@ public class ChromaWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawQuickPreset(int count)
-    {
-        string[] keys = new string[_config.m_presets.Count];
-        for (int i = 0; i < keys.Length; i++) keys[i] = _config.m_presets[i].m_key;
-        _presetIndex = Mathf.Clamp(_presetIndex, 0, keys.Length - 1);
-
-        EditorGUILayout.BeginHorizontal();
-        _presetIndex = EditorGUILayout.Popup(_presetIndex, keys);
-        using (new EditorGUI.DisabledScope(count == 0))
-            if (GUILayout.Button("Apply preset", GUILayout.Width(96)))
-                ApplyPresetToSelection(keys[_presetIndex]);
-        EditorGUILayout.EndHorizontal();
-        EditorGUILayout.LabelField("Writes a short '" + keys[_presetIndex] + "=Title' to the name.", EditorStyles.miniLabel);
-    }
-
     #endregion
 
 
     #region Selection logic
 
+    /// <summary>Detect selection changes and refresh the draft editor when a new object is selected.</summary>
     private void SyncSelection()
     {
         GameObject current = (Selection.gameObjects != null && Selection.gameObjects.Length == 1)
@@ -358,9 +368,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
-    // Pre-fills the draft from the single selected object when it's already a banner (component
-    // first, then name-based). Non-banner / multi selections leave the draft untouched so a setup
-    // can be reused across objects.
+    /// <summary>Pre-fill the draft editor from an existing banner on the selected object (component or name-based).</summary>
     private void RefreshDraft()
     {
         _selSource = SelSource.None;
@@ -410,6 +418,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Apply the draft editor settings to all selected GameObjects (as component or name).</summary>
     private void ApplyDraft()
     {
         GameObject[] sel = Selection.gameObjects;
@@ -423,6 +432,7 @@ public class ChromaWindow : EditorWindow
         EditorApplication.RepaintHierarchyWindow();
     }
 
+    /// <summary>Write the draft settings to a ChromaBanner component on a GameObject.</summary>
     private void WriteComponent(GameObject go)
     {
         ChromaBanner b = go.GetComponent<ChromaBanner>();
@@ -442,6 +452,7 @@ public class ChromaWindow : EditorWindow
         EditorUtility.SetDirty(b);
     }
 
+    /// <summary>Write the draft settings to a GameObject's name (as a banner spec).</summary>
     private void WriteName(GameObject go)
     {
         Undo.RecordObject(go, "Chroma: apply banner");
@@ -450,6 +461,7 @@ public class ChromaWindow : EditorWindow
         EditorUtility.SetDirty(go);
     }
 
+    /// <summary>Update only the title part of an existing name banner, preserving the color spec.</summary>
     private void ApplyTitleOnly()
     {
         if (_selObject == null) return;
@@ -459,6 +471,7 @@ public class ChromaWindow : EditorWindow
         EditorApplication.RepaintHierarchyWindow();
     }
 
+    /// <summary>Encode the current draft settings into a banner spec string (colors, alignment, style, etc.).</summary>
     private string BuildDraftSpec()
     {
         string spec;
@@ -482,6 +495,7 @@ public class ChromaWindow : EditorWindow
         return spec;
     }
 
+    /// <summary>Apply a preset key to all selected GameObjects (as name banners).</summary>
     private void ApplyPresetToSelection(string key)
     {
         if (string.IsNullOrEmpty(key)) return;
@@ -496,7 +510,7 @@ public class ChromaWindow : EditorWindow
         EditorApplication.RepaintHierarchyWindow();
     }
 
-    // Recolors the selection: sets the component color if there is one, else rewrites the name's color.
+    /// <summary>Change the banner color of the selected object(s) without affecting other settings.</summary>
     private void RecolorSelection(string colorToken)
     {
         ChromaHeaders.TryGetColor(colorToken, out Color col);
@@ -522,6 +536,7 @@ public class ChromaWindow : EditorWindow
         EditorApplication.RepaintHierarchyWindow();
     }
 
+    /// <summary>Draw the bookmarks section: add, list, reorder, and jump to bookmarked objects.</summary>
     private void DrawBookmarks()
     {
         int sel = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
@@ -591,13 +606,14 @@ public class ChromaWindow : EditorWindow
 
     #region Settings tab
 
+    /// <summary>Draw the Settings tab: global Chroma configuration (display toggles, rules, RGB mode, presets).</summary>
     private void DrawSettingsTab()
     {
-        // Self-managed sections (own undo / version bumps), kept outside the change-check.
-        if (BeginSection("Folder colors", "folders")) DrawFolderColors();
+        // Themes and Folder colors: managed separately (own undo/version bumps)
+        if (BeginSection("Themes", "themes")) DrawThemes();
         EndSection();
 
-        if (BeginSection("Themes", "themes")) DrawThemes();
+        if (BeginSection("Folder colors", "folders")) DrawFolderColors();
         EndSection();
 
         EditorGUI.BeginChangeCheck();
@@ -637,27 +653,38 @@ public class ChromaWindow : EditorWindow
         DrawFooter();
     }
 
+    /// <summary>Draw the Display section: banner enable, child count, zebra striping toggles.</summary>
     private void DrawToggles()
     {
-        EditorGUILayout.PropertyField(_so.FindProperty("m_enableHeaders"), new GUIContent("Section banners"));
-        EditorGUILayout.PropertyField(_so.FindProperty("m_showChildCount"), new GUIContent("Child count (N)"));
+        EditorGUILayout.LabelField("Show/hide various visual elements", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+        EditorGUILayout.PropertyField(_so.FindProperty("m_enableHeaders"),
+            new GUIContent("Section banners", "Show colored banners when names contain #color codes"));
+        EditorGUILayout.PropertyField(_so.FindProperty("m_showChildCount"),
+            new GUIContent("Child count (N)", "Display number of children next to each object"));
 
         SerializedProperty zebra = _so.FindProperty("m_zebra");
-        EditorGUILayout.PropertyField(zebra, new GUIContent("Zebra striping"));
+        EditorGUILayout.PropertyField(zebra, new GUIContent("Zebra striping", "Alternate row backgrounds"));
         using (new EditorGUI.DisabledScope(!zebra.boolValue))
             EditorGUILayout.PropertyField(_so.FindProperty("m_zebraColor"), new GUIContent("Stripe color"));
     }
 
+    /// <summary>Draw the Tree Lines section: enable/disable guide lines and customize their color.</summary>
     private void DrawTreeLinesSection()
     {
+        EditorGUILayout.LabelField("File explorer style connector lines in the indent gutter", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         SerializedProperty enabled = _so.FindProperty("m_enableTreeLines");
-        EditorGUILayout.PropertyField(enabled, new GUIContent("Tree guide lines"));
+        EditorGUILayout.PropertyField(enabled, new GUIContent("Tree guide lines", "File explorer style connector lines"));
         using (new EditorGUI.DisabledScope(!enabled.boolValue))
             EditorGUILayout.PropertyField(_so.FindProperty("m_treeLineColor"), new GUIContent("Line color"));
     }
 
+    /// <summary>Draw the Separators section: configure visual style and text styling for separator rows (---/___).</summary>
     private void DrawSeparatorsSection()
     {
+        EditorGUILayout.LabelField("Visual separator rows (name objects '---' or '___')", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         SerializedProperty enabled = _so.FindProperty("m_enableSeparators");
         EditorGUILayout.PropertyField(enabled, new GUIContent("Separator rows"));
         using (new EditorGUI.DisabledScope(!enabled.boolValue))
@@ -672,34 +699,42 @@ public class ChromaWindow : EditorWindow
         EditorGUILayout.LabelField("Name an object '---' / '___' (or '--- Label')", EditorStyles.miniLabel);
     }
 
+    /// <summary>Draw the Child Inheritance section: control whether children inherit parent banner colors and fade settings.</summary>
     private void DrawInherit()
     {
+        EditorGUILayout.LabelField("Children tint from parent banners (flat or depth-fading)", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         SerializedProperty enabled = _so.FindProperty("m_enableChildInherit");
-        EditorGUILayout.PropertyField(enabled, new GUIContent("Inherit parent color"));
+        EditorGUILayout.PropertyField(enabled, new GUIContent("Inherit parent color", "Children inherit color from parent banners"));
 
         if (enabled.boolValue)
         {
             EditorGUI.indentLevel++;
             SerializedProperty mode = _so.FindProperty("m_childInheritMode");
-            EditorGUILayout.PropertyField(mode, new GUIContent("Mode"));
-            EditorGUILayout.PropertyField(_so.FindProperty("m_childInheritOpacity"), new GUIContent("Opacity"));
+            EditorGUILayout.PropertyField(mode, new GUIContent("Mode", "Flat: constant opacity, DepthFade: fades with depth"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_childInheritOpacity"), new GUIContent("Opacity", "Base opacity for inherited colors"));
             if (mode.enumValueIndex == (int)ChildInheritMode.DepthFade)
-                EditorGUILayout.PropertyField(_so.FindProperty("m_childInheritFalloff"), new GUIContent("Depth falloff"));
+                EditorGUILayout.PropertyField(_so.FindProperty("m_childInheritFalloff"), new GUIContent("Depth falloff", "How quickly opacity fades per level"));
             EditorGUI.indentLevel--;
         }
     }
 
+    /// <summary>Draw the Build section: toggle stripping of Chroma specs from names in built scenes.</summary>
     private void DrawBuildSection()
     {
+        EditorGUILayout.LabelField("Clean up GameObject names before building", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         EditorGUILayout.PropertyField(_so.FindProperty("m_stripNamesInBuild"),
             new GUIContent("Strip names in build",
                 "When ON, GameObject names with Chroma specs ('#xxx center bold=Title') are reduced to just 'Title' in built scenes. Scene .unity assets on disk are not modified."));
         EditorGUILayout.LabelField("ChromaBanner components are always removed from builds.", EditorStyles.miniLabel);
     }
 
+    /// <summary>Draw the Auto-Color Rules section: manage rules to tint rows by Tag, Layer, name, or regex.</summary>
     private void DrawAutoColorRules()
     {
-        EditorGUILayout.LabelField("Tint rows by Tag / Layer / name prefix / regex", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("Auto-tint rows by Tag, Layer, name prefix, or regex pattern", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         SerializedProperty rules = _so.FindProperty("m_autoColorRules");
 
         for (int i = 0; i < rules.arraySize; i++)
@@ -740,23 +775,31 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Draw the RGB Mode section: animate rows through rainbow colors (the signature Chroma feature).</summary>
     private void DrawRgbSection()
     {
-        EditorGUILayout.PropertyField(_so.FindProperty("m_rgbMode"), new GUIContent("Rainbow mode"));
+        EditorGUILayout.LabelField("Animate rows through rainbow colors (~30fps). The original Chroma signature!", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+        EditorGUILayout.PropertyField(_so.FindProperty("m_rgbMode"),
+            new GUIContent("Rainbow mode", "Animate every row through rainbow colors ~30fps"));
         using (new EditorGUI.DisabledScope(!_so.FindProperty("m_rgbMode").boolValue))
         {
-            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSpeed"), new GUIContent("Speed"));
-            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSpread"), new GUIContent("Hue spread / row"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSpeed"), new GUIContent("Speed", "Animation speed"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSpread"), new GUIContent("Hue spread", "Color variance per row"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSaturation"), new GUIContent("Saturation"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbValue"), new GUIContent("Brightness"));
-            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbAlpha"), new GUIContent("Opacity (rows)"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbAlpha"), new GUIContent("Opacity"));
         }
-        EditorGUILayout.PropertyField(_so.FindProperty("m_rgbFolders"), new GUIContent("Rainbow folders"));
-        EditorGUILayout.LabelField("Animated. Rows need Rainbow mode; folders use Rainbow folders.", EditorStyles.miniLabel);
+        EditorGUILayout.PropertyField(_so.FindProperty("m_rgbFolders"),
+            new GUIContent("Rainbow folders", "Also animate Project window folder icons"));
+        EditorGUILayout.LabelField("The original Chroma feature!", EditorStyles.miniLabel);
     }
 
+    /// <summary>Draw the Folder Colors section: manage colors for folders in the Project window.</summary>
     private void DrawFolderColors()
     {
+        EditorGUILayout.LabelField("Color folders in the Project window", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         bool en = EditorGUILayout.Toggle("Enable folder colors", _config.m_enableFolderColors);
         if (en != _config.m_enableFolderColors)
         {
@@ -806,6 +849,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Get the GUIDs of selected folders in the Project window.</summary>
     private List<string> SelectedFolderGuids()
     {
         var guids = new List<string>();
@@ -820,19 +864,23 @@ public class ChromaWindow : EditorWindow
         return guids;
     }
 
+    /// <summary>Draw the Themes section: buttons to apply predefined color schemes (Minimal, Vibrant, Soft, High-Contrast).</summary>
     private void DrawThemes()
     {
-        EditorGUILayout.LabelField("One click sets tree/separator colors + preset palette.", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("One-click color schemes for tree lines, separators, and presets", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+        EditorGUILayout.Space(4);
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Minimal")) ApplyTheme("minimal");
-        if (GUILayout.Button("Vibrant")) ApplyTheme("vibrant");
+        if (GUILayout.Button("Minimal", GUILayout.Height(26))) ApplyTheme("minimal");
+        if (GUILayout.Button("Vibrant", GUILayout.Height(26))) ApplyTheme("vibrant");
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Soft")) ApplyTheme("soft");
-        if (GUILayout.Button("High-contrast")) ApplyTheme("contrast");
+        if (GUILayout.Button("Soft", GUILayout.Height(26))) ApplyTheme("soft");
+        if (GUILayout.Button("High-Contrast", GUILayout.Height(26))) ApplyTheme("contrast");
         EditorGUILayout.EndHorizontal();
     }
 
+    /// <summary>Apply a preset theme: update tree line color, separator style, and presets.</summary>
     private void ApplyTheme(string theme)
     {
         Undo.RecordObject(_config, "Chroma: apply theme");
@@ -871,10 +919,12 @@ public class ChromaWindow : EditorWindow
 
         _config.m_version++;
         EditorUtility.SetDirty(_config);
-        _so.Update();
         ChromaHeaders.OnConfigChanged(_config);
+        EditorApplication.RepaintHierarchyWindow();
+        Repaint();
     }
 
+    /// <summary>Build a list of theme presets from color specs.</summary>
     private static List<ChromaConfig.Preset> ThemePresets(string h1, string h2, string h3, string cat, string grad)
     {
         return new List<ChromaConfig.Preset>
@@ -887,8 +937,29 @@ public class ChromaWindow : EditorWindow
         };
     }
 
+    /// <summary>Draw the Quick Preset section: dropdown to select and apply a preset to selected objects.</summary>
+    private void DrawQuickPreset(int count)
+    {
+        EditorGUILayout.LabelField("Apply a preset style to the selection", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+        string[] keys = new string[_config.m_presets.Count];
+        for (int i = 0; i < keys.Length; i++) keys[i] = _config.m_presets[i].m_key;
+        _presetIndex = Mathf.Clamp(_presetIndex, 0, keys.Length - 1);
+
+        EditorGUILayout.BeginHorizontal();
+        _presetIndex = EditorGUILayout.Popup(_presetIndex, keys);
+        using (new EditorGUI.DisabledScope(count == 0))
+            if (GUILayout.Button("Apply preset", GUILayout.Width(96)))
+                ApplyPresetToSelection(keys[_presetIndex]);
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField("Writes a short '" + keys[_presetIndex] + "=Title' to the name.", EditorStyles.miniLabel);
+    }
+
+    /// <summary>Draw the Banner Presets section: manage preset keys and specs with live color swatches.</summary>
     private void DrawPresets()
     {
+        EditorGUILayout.LabelField("Create custom presets for quick banner styling", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
         SerializedProperty presets = _so.FindProperty("m_presets");
         bool hasSearch = !string.IsNullOrWhiteSpace(_search);
         int removeAt = -1;
@@ -943,6 +1014,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Draw the footer: Reset to Defaults, Show Asset, and Import/Export buttons.</summary>
     private void DrawFooter()
     {
         EditorGUILayout.Space(4);
@@ -972,6 +1044,7 @@ public class ChromaWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
+    /// <summary>Export the current config to a JSON file.</summary>
     private void ExportConfig()
     {
         string path = EditorUtility.SaveFilePanel("Export Chroma config", "", "chroma-config.json", "json");
@@ -980,6 +1053,7 @@ public class ChromaWindow : EditorWindow
         catch (Exception ex) { EditorUtility.DisplayDialog("Chroma", "Export failed:\n" + ex.Message, "OK"); }
     }
 
+    /// <summary>Import a previously exported config JSON file.</summary>
     private void ImportConfig()
     {
         string path = EditorUtility.OpenFilePanel("Import Chroma config", "", "json");
@@ -1002,6 +1076,7 @@ public class ChromaWindow : EditorWindow
 
     #region Tools and Utilities
 
+    /// <summary>Draw a horizontal or vertical gradient rectangle between two colors.</summary>
     private static void DrawGradientRect(Rect r, Color a, Color b, bool vertical)
     {
         const int n = 24;
@@ -1016,6 +1091,7 @@ public class ChromaWindow : EditorWindow
         }
     }
 
+    /// <summary>Convert alignment index (0=Center, 1=Left, 2=Right) to TextAnchor.</summary>
     private static TextAnchor AlignAnchor(int i)
     {
         if (i == 1) return TextAnchor.MiddleLeft;
@@ -1023,6 +1099,7 @@ public class ChromaWindow : EditorWindow
         return TextAnchor.MiddleCenter;
     }
 
+    /// <summary>Convert style index (0=Bold, 1=Normal, 2=Italic, 3=BoldItalic) to FontStyle.</summary>
     private static FontStyle FontStyleOf(int i)
     {
         if (i == 1) return FontStyle.Normal;
@@ -1031,13 +1108,14 @@ public class ChromaWindow : EditorWindow
         return FontStyle.Bold;
     }
 
+    /// <summary>Extract the title part from a banner spec (text after '=').</summary>
     private static string ExtractTitle(string name)
     {
         int eq = name.IndexOf('=');
         return eq >= 0 ? name.Substring(eq + 1).Trim() : name;
     }
 
-    // Replaces the background of a name with colorToken, keeping title + other options.
+    /// <summary>Replace the color token in a banner spec while preserving alignment, style, size, and title.</summary>
     private static string ReplaceColor(string name, string colorToken)
     {
         int eq = name.IndexOf('=');
@@ -1052,6 +1130,7 @@ public class ChromaWindow : EditorWindow
         return string.Join(" ", kept) + "=" + title;
     }
 
+    /// <summary>Check if a token is a color: hex (#color), gradient (color>color), or named color.</summary>
     private static bool IsColorToken(string token)
     {
         if (token.StartsWith("#")) return true;
@@ -1113,12 +1192,12 @@ public class ChromaWindow : EditorWindow
     private GameObject _selEvaluatedFor;
     private string _selEvaluatedName;
 
-    private int _presetIndex;
     private Color _freeRecolorColor = new Color(0.30f, 0.60f, 0.90f);
     private Color _folderPickColor = new Color(0.30f, 0.55f, 1f);
     private string _search = "";
 
     private readonly Dictionary<string, AnimBool> _anims = new Dictionary<string, AnimBool>();
+    private int _presetIndex;
 
     private GUIStyle _titleStyle;
     private GUIStyle _subTitleStyle;

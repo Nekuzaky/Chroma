@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 550ec41fe696ad64ea943eebdcdf45e5, type: 3}
+  m_Name: ChromaConfig
+  m_EditorClassIdentifier: Chroma.Editor::Chroma.Editor.ChromaConfig
+  m_enableHeaders: 1
+  m_enableTreeLines: 1
+  m_treeLineColor: {r: 1, g: 1, b: 1, a: 0.1}
+  m_showChildCount: 0
+  m_zebra: 0
+  m_zebraColor: {r: 1, g: 1, b: 1, a: 0.03}
+  m_enableFolderColors: 1
+  m_folderColors:
+  - m_guid: 75126c0ff8606b2469a99aef4ecff2d4
+    m_color: {r: 0.3, g: 0.55, b: 1, a: 1}
+  m_enableSeparators: 1
+  m_separatorColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+  m_separatorFillColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_separatorStyle: 0
+  m_separatorBold: 1
+  m_separatorItalic: 0
+  m_separatorUppercase: 0
+  m_enableChildInherit: 1
+  m_childInheritMode: 1
+  m_childInheritOpacity: 0.231
+  m_childInheritFalloff: 0.26
+  m_autoColorRules: []
+  m_stripNamesInBuild: 1
+  m_rgbMode: 0
+  m_rgbSpeed: 0.436
+  m_rgbSaturation: 1
+  m_rgbValue: 0.773
+  m_rgbAlpha: 0.8
+  m_rgbSpread: 0.00067
+  m_rgbFolders: 0
+  m_presets:
+  - m_key: h1
+    m_spec: '#3a3f44 center bold s12 text:white'
+  - m_key: h2
+    m_spec: '#4a4f55 left bold text:white'
+  - m_key: h3
+    m_spec: '#2c2f33 left italic text:white'
+  - m_key: cat
+    m_spec: '#33363a left bold text:white'
+  - m_key: grad
+    m_spec: '#3a3f44>#2c2f33 center bold text:white'
+  m_version: 2184

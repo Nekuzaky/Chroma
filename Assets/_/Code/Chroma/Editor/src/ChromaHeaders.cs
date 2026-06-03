@@ -5,20 +5,12 @@ using UnityEngine;
 
 namespace Chroma.Editor
 {
-// Chroma: color-codes Unity's Hierarchy window. Configured via Tools/Chroma
-// (ChromaConfig asset). Optimized rendering: cached styles, Repaint guard,
-// cached parsing, cached gradient textures.
-//
-// BANNERS: rename a GameObject "<options>=<Title>". Options (space-separated, any order):
-//   Background : name (green, red, blue, orange, gray/grey, yellow, mauve, white, black,
-//                cyan, purple, pink) OR hex (#FF8800, #f80, #FF8800AA)
-//   Gradient   : colorA>colorB  e.g. #1f6feb>#ff8800  or  blue>orange   (add "vertical" for top->bottom)
-//   Align      : left | center | right    Style: bold | italic | bolditalic | normal
-//   Size       : s<N>    Text: text:<color>    Preset: a key defined in the config (h1, h2, grad...)
-//   No background: "nobg" => text-only label (row masked with the theme color, no colored block)
-// EXTRAS (toggled in the panel): tree guide lines, auto-color rules (Tag/Layer/name-prefix/regex),
-//   child-color inheritance, child count "(N)", zebra striping, animated RGB mode, bookmark stars
-//   (ChromaBookmarks), and Project-window folder colors (ChromaFolders).
+/// <summary>
+/// Core Chroma hierarchy rendering system. Hooks into OnHierarchyGUI to draw colored banners,
+/// separators, tree guide lines, auto-color rules, zebra striping, RGB mode, and child-count labels.
+/// Banners are specified in GameObject names (e.g., "blue center bold=Title") or via ChromaBanner components.
+/// Configuration: ChromaConfig asset. Optimizations: cached styles, parsed specs, gradient textures, repaint guard.
+/// </summary>
 [InitializeOnLoad]
 public static class ChromaHeaders
 {
@@ -52,10 +44,10 @@ public static class ChromaHeaders
         AssemblyReloadEvents.beforeAssemblyReload += ClearComponentCache;
         EditorApplication.hierarchyChanged += ClearComponentCache;
         ChromaBanner.Changed += OnComponentChanged;
-        // Config may not be loadable yet inside the static ctor; defer the RGB pump check.
         EditorApplication.delayCall += () => EnsureRgbPump(Config);
     }
 
+    /// <summary>Renders colored banners, separators, tree lines, and tints for a single hierarchy row.</summary>
     private static void OnHierarchyGUI(int instanceID, Rect selectionRect)
     {
         if (Event.current.type != EventType.Repaint) return;
@@ -126,7 +118,7 @@ public static class ChromaHeaders
     #region Main API
 
     // Called by the window after a config edit, and by ChromaConfig.OnValidate for
-    // direct Inspector edits.
+    /// <summary>Notify ChromaHeaders of config changes. Clears caches and repaints the Hierarchy and Project windows.</summary>
     public static void OnConfigChanged(ChromaConfig cfg)
     {
         _configCache = cfg;
@@ -137,8 +129,7 @@ public static class ChromaHeaders
         EditorApplication.RepaintHierarchyWindow();
     }
 
-    // Drives the rainbow animation by repainting the Hierarchy on a timer. Subscribed only while
-    // RGB mode is on, and throttled to ~30fps so it never spins the editor harder than needed.
+    /// <summary>Subscribe/unsubscribe the RGB pump based on whether RGB mode is enabled. Throttled to ~30fps.</summary>
     private static void EnsureRgbPump(ChromaConfig cfg)
     {
         bool want = cfg != null && (cfg.m_rgbMode || cfg.m_rgbFolders);
@@ -154,6 +145,7 @@ public static class ChromaHeaders
         }
     }
 
+    /// <summary>Timer callback: repaints Hierarchy/Project windows at ~30fps to animate rainbow colors.</summary>
     private static void RgbPump()
     {
         double now = EditorApplication.timeSinceStartup;
@@ -165,6 +157,7 @@ public static class ChromaHeaders
         if (cfg != null && cfg.m_rgbFolders) EditorApplication.RepaintProjectWindow();
     }
 
+    /// <summary>Draw animated rainbow tint for a single row in RGB mode.</summary>
     private static void DrawRgbTint(Rect rect, ChromaConfig cfg)
     {
         float hue = Mathf.Repeat(
@@ -174,6 +167,7 @@ public static class ChromaHeaders
         EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), c);
     }
 
+    /// <summary>Clear cached layer and regex compilations in auto-color rules.</summary>
     private static void InvalidateAutoColorCache(ChromaConfig cfg)
     {
         if (cfg == null || cfg.m_autoColorRules == null) return;
@@ -186,8 +180,7 @@ public static class ChromaHeaders
         }
     }
 
-    // Extract the first background color from a spec, resolving preset references. Used by the
-    // window to draw inline preview swatches.
+    /// <summary>Extract the first background color from a banner spec, resolving preset references. Used by the window to draw color preview swatches.</summary>
     internal static bool TryGetPreviewColor(string spec, out Color color)
     {
         return TryGetPreviewColorInternal(spec, 0, out color);

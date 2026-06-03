@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
+  <component name="CMakeSettings">
+    <configurations />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="e6741afe-6a45-440f-8d38-89f3187cdbb5" name="Changes" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/Assets/_/Code/Chroma/Tests/ChromaParsingTests.cs" root0="SKIP_HIGHLIGHTING" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0" />
+      <entry key="S2" value="1.0000954605273173" />
+      <entry key="S5" value="1.0601796162408326" />
+      <entry key="S10" value="1.6277257884394165" />
+      <entry key="S30" value="5.020124106138491" />
+      <entry key="S60" value="8.415710023816736" />
+      <entry key="M2" value="13.079244375176042" />
+      <entry key="M5" value="21.118371021720026" />
+      <entry key="M10" value="26.33153074922554" />
+      <entry key="M15" value="28.56108080853924" />
+      <entry key="M30" value="31.10118745964553" />
+      <entry key="H1" value="32.5024606004419" />
+      <entry key="H2" value="33.23875807468651" />
+      <entry key="H4" value="33.616204324686166" />
+      <entry key="D1" value="33.9355882274479" />
+      <entry key="W1" value="33.99078733559657" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.9592641193252643" />
+      <entry key="MS500" value="0.9917167307382933" />
+      <entry key="S2" value="0.9980179836009254" />
+      <entry key="S5" value="1.0592992490424695" />
+      <entry key="S10" value="1.6270511482634216" />
+      <entry key="S30" value="5.019413427337644" />
+      <entry key="S60" value="8.41511086307321" />
+      <entry key="M2" value="13.078779988069686" />
+      <entry key="M5" value="21.11807211265177" />
+      <entry key="M10" value="26.3313445635356" />
+      <entry key="M15" value="28.560946203335977" />
+      <entry key="M30" value="31.101114183411315" />
+      <entry key="H1" value="32.5024223139871" />
+      <entry key="H2" value="33.23873849831429" />
+      <entry key="H4" value="33.61619442546789" />
+      <entry key="D1" value="33.93558656191852" />
+      <entry key="W1" value="33.99078709727716" />
+    </decayedShown>
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "node.js.selected.package.tslint": "(autodetect)"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <servers />
+  </component>
+  <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
+</project>
