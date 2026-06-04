@@ -611,14 +611,25 @@ public static class ChromaHeaders
             r.m_cachedRegexFor = r.m_value;
             try
             {
-                r.m_cachedRegex = new System.Text.RegularExpressions.Regex(r.m_value);
+                r.m_cachedRegex = new System.Text.RegularExpressions.Regex(r.m_value, System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan.FromMilliseconds(100));
             }
             catch (ArgumentException)
             {
                 r.m_cachedRegex = null; // invalid pattern -> never matches
             }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                r.m_cachedRegex = null; // regex too complex -> never matches
+            }
         }
-        return r.m_cachedRegex != null && r.m_cachedRegex.IsMatch(name);
+        try
+        {
+            return r.m_cachedRegex != null && r.m_cachedRegex.IsMatch(name);
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            return false; // matching timeout -> no match
+        }
     }
 
     // Walks up to the nearest banner ancestor and returns its color at a reduced opacity

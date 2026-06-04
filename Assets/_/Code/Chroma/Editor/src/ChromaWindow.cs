@@ -1330,6 +1330,7 @@ public class ChromaWindow : EditorWindow
             string json = File.ReadAllText(path);
             Undo.RecordObject(_config, "Import Chroma config");
             JsonUtility.FromJsonOverwrite(json, _config);
+            _config.ValidateAndClamp(); // Sanitize imported values to safe ranges
             _config.m_version++;
             EditorUtility.SetDirty(_config);
             _so.Update();
