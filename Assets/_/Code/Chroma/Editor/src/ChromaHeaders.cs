@@ -182,11 +182,108 @@ public static class ChromaHeaders
     /// <summary>Draw animated rainbow tint for a single row in RGB mode.</summary>
     private static void DrawRgbTint(Rect rect, ChromaConfig cfg)
     {
+        float speed = cfg.m_rgbSpeed;
+        if (cfg.m_rgbTheme != RGBTheme.Classic) speed *= 0.7f; // Reduce speed by 30% for themed modes
+
         float hue = Mathf.Repeat(
-            (float)(EditorApplication.timeSinceStartup * cfg.m_rgbSpeed) + rect.y * cfg.m_rgbSpread, 1f);
-        Color c = Color.HSVToRGB(hue, cfg.m_rgbSaturation, cfg.m_rgbValue);
+            (float)(EditorApplication.timeSinceStartup * speed) + rect.y * cfg.m_rgbSpread, 1f);
+        float saturation = cfg.m_rgbSaturation;
+        float brightness = cfg.m_rgbValue;
+
+        GetRgbThemeHSV(cfg.m_rgbTheme, ref hue, ref saturation, ref brightness);
+
+        Color c = Color.HSVToRGB(hue, saturation, brightness);
         c.a = cfg.m_rgbAlpha;
         EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width + RowExtra, rect.height), c);
+    }
+
+    /// <summary>Apply theme-specific hue, saturation, and brightness adjustments. Public for use by other modules.</summary>
+    public static void ApplyRgbTheme(RGBTheme theme, ref float hue, ref float saturation, ref float brightness)
+    {
+        GetRgbThemeHSV(theme, ref hue, ref saturation, ref brightness);
+    }
+
+    /// <summary>Apply theme-specific hue, saturation, and brightness adjustments.</summary>
+    private static void GetRgbThemeHSV(RGBTheme theme, ref float hue, ref float saturation, ref float brightness)
+    {
+        switch (theme)
+        {
+            case RGBTheme.Halloween:
+                // ULTRA STRICT: Orange -> Violet -> Black only, no other colors
+                float halloPhase = hue;
+                if (halloPhase < 0.33f)
+                {
+                    // Orange zone: keep orange hue, smooth brightness
+                    hue = 0.08f;
+                    saturation = 0.9f;
+                    brightness = Mathf.Lerp(0.5f, 1f, halloPhase / 0.33f);
+                }
+                else if (halloPhase < 0.66f)
+                {
+                    // Violet/Black zone: violet hue, fade to black
+                    float t = (halloPhase - 0.33f) / 0.33f;
+                    hue = 0.78f;
+                    saturation = Mathf.Lerp(0.9f, 0.05f, t);
+                    brightness = Mathf.Lerp(1f, 0.1f, t);
+                }
+                else
+                {
+                    // Black zone: nearly black, transition back to orange
+                    float t = (halloPhase - 0.66f) / 0.33f;
+                    hue = Mathf.Lerp(0.78f, 0.08f, t);
+                    saturation = Mathf.Lerp(0.05f, 0.9f, t);
+                    brightness = Mathf.Lerp(0.1f, 0.5f, t);
+                }
+                break;
+
+            case RGBTheme.Christmas:
+                // Cycle: Red (0) -> Green (0.33) -> Gold (0.14) -> Red
+                if (hue < 0.33f)
+                {
+                    hue = Mathf.Lerp(0f, 0.33f, hue / 0.33f);
+                }
+                else if (hue < 0.66f)
+                {
+                    hue = Mathf.Lerp(0.33f, 0.14f, (hue - 0.33f) / 0.33f);
+                }
+                else
+                {
+                    hue = Mathf.Lerp(0.14f, 0f, (hue - 0.66f) / 0.33f);
+                }
+                saturation = 0.85f;
+                brightness = 0.9f;
+                break;
+
+            case RGBTheme.Valentine:
+                // ULTRA STRICT: Pure Red -> Pure Pink -> Pure Magenta (NO interpolation)
+                float valPhase = hue;
+                if (valPhase < 0.33f)
+                {
+                    // Deep Red zone (pure red hue only)
+                    hue = 0f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(0.7f, 1f, valPhase / 0.33f);
+                }
+                else if (valPhase < 0.66f)
+                {
+                    // Hot Pink zone (pure pink hue only)
+                    hue = 0.92f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(1f, 1f, (valPhase - 0.33f) / 0.33f);
+                }
+                else
+                {
+                    // Magenta zone (pure magenta hue only)
+                    hue = 0.83f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(1f, 0.7f, (valPhase - 0.66f) / 0.33f);
+                }
+                break;
+
+            case RGBTheme.Classic:
+            default:
+                break;
+        }
     }
 
     /// <summary>Clear cached layer and regex compilations in auto-color rules.</summary>
