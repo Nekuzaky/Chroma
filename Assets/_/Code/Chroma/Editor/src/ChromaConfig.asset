@@ -38,13 +38,13 @@ MonoBehaviour:
   m_childInheritFalloff: 0.26
   m_autoColorRules: []
   m_stripNamesInBuild: 1
-  m_rgbMode: 0
-  m_rgbSpeed: 0.436
+  m_rgbMode: 1
+  m_rgbSpeed: 3
   m_rgbSaturation: 1
-  m_rgbValue: 0.773
+  m_rgbValue: 0.961
   m_rgbAlpha: 0.8
-  m_rgbSpread: 0.00067
-  m_rgbFolders: 0
+  m_rgbSpread: 0.02
+  m_rgbFolders: 1
   m_presets:
   - m_key: h1
     m_spec: '#3a3f44 center bold s12 text:white'
@@ -56,4 +56,4 @@ MonoBehaviour:
     m_spec: '#33363a left bold text:white'
   - m_key: grad
     m_spec: '#3a3f44>#2c2f33 center bold text:white'
-  m_version: 2188
+  m_version: 2250
