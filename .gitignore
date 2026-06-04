@@ -108,3 +108,8 @@ InitTestScene*.unity*
 
 Nekuzaky
 Nekuzaky.meta
+.idea
+.vscode
+.claude
+.ai
+.ai/mcp

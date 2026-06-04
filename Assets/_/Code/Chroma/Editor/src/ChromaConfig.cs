@@ -92,6 +92,8 @@ public class ChromaConfig : ScriptableObject
     public bool m_enableFolderColors = true;
     [Tooltip("List of folder GUIDs and their assigned colors")]
     public List<FolderColor> m_folderColors = new List<FolderColor>();
+    [Tooltip("Child folders inherit color from parent folder")]
+    public bool m_folderColorInheritance = true;
 
     [Header("Separators")]
     [Tooltip("Show separator rows (objects named '---' or '___')")]

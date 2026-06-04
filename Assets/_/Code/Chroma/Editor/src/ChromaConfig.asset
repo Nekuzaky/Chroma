@@ -23,6 +23,7 @@ MonoBehaviour:
   m_warnMissingScripts: 1
   m_enableFolderColors: 1
   m_folderColors: []
+  m_folderColorInheritance: 1
   m_enableSeparators: 1
   m_separatorColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_separatorFillColor: {r: 0.22, g: 0.22, b: 0.22, a: 1}
@@ -55,4 +56,4 @@ MonoBehaviour:
     m_spec: '#444 left bold text:white'
   - m_key: grad
     m_spec: '#1f6feb>#7b2ff7 center bold text:white'
-  m_version: 2686
+  m_version: 2690
