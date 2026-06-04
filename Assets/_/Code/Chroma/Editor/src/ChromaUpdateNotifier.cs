@@ -24,6 +24,7 @@ public static class ChromaUpdateNotifier
         {
             EditorPrefs.SetString(PREF_KEY, CURRENT_VERSION);
             ShowPatchNotes(lastSeen);
+            Debug.Log($"[Chroma] Showing patch notes. Previous: {lastSeen}, Current: {CURRENT_VERSION}");
         }
     }
 

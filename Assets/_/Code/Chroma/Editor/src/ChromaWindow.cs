@@ -16,7 +16,7 @@ namespace Chroma.Editor
 /// </summary>
 public class ChromaWindow : EditorWindow
 {
-    private enum Tab { Selection, Search, Settings }
+    private enum Tab { Selection, Settings }
     private enum OutputMode { Name, Component }
     private enum SelSource { None, NameBanner, Component }
 
@@ -87,7 +87,7 @@ public class ChromaWindow : EditorWindow
         // --- Tab bar ---
         var tabbar = new VisualElement();
         tabbar.AddToClassList("chroma-tabbar");
-        _tabButtons = new[] { MakeTab("Selection", Tab.Selection), MakeTab("Search", Tab.Search), MakeTab("Settings", Tab.Settings) };
+        _tabButtons = new[] { MakeTab("Selection", Tab.Selection), MakeTab("Settings", Tab.Settings) };
         tabbar.Add(_tabButtons[0]);
         tabbar.Add(_tabButtons[1]);
         root.Add(tabbar);
@@ -275,8 +275,7 @@ public class ChromaWindow : EditorWindow
     {
         if (_tabButtons == null) return;
         _tabButtons[0].EnableInClassList("chroma-tab--active", _tab == Tab.Selection);
-        _tabButtons[1].EnableInClassList("chroma-tab--active", _tab == Tab.Search);
-        _tabButtons[2].EnableInClassList("chroma-tab--active", _tab == Tab.Settings);
+        _tabButtons[1].EnableInClassList("chroma-tab--active", _tab == Tab.Settings);
     }
 
     /// <summary>Locate the window's USS stylesheet by name, wherever the Chroma folder lives.</summary>
@@ -1524,12 +1523,7 @@ public class ChromaWindow : EditorWindow
     // UI Toolkit chrome.
     private Button[] _tabButtons;
     private VisualElement _selectionRoot;
-    private VisualElement _searchRoot;
     private VisualElement _settingsRoot;
-
-    private string _searchQuery = "";
-    private List<GameObject> _searchResults = new List<GameObject>();
-    private Vector2 _searchScroll;
     private List<IMGUIContainer> _settingsBodies;
     private IMGUIContainer _selExtras;
     private bool _refreshing;
