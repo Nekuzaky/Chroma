@@ -60,11 +60,8 @@ public class ChromaWindow : EditorWindow
         // --- Header (logo + title + search) ---
         var header = new VisualElement();
         header.AddToClassList("chroma-header");
-
         var titleRow = new VisualElement();
         titleRow.AddToClassList("chroma-titlerow");
-        var logo = new VisualElement();
-        logo.AddToClassList("chroma-logo");
         var titles = new VisualElement();
         var title = new Label("Chroma");
         title.AddToClassList("chroma-title");
@@ -72,7 +69,6 @@ public class ChromaWindow : EditorWindow
         sub.AddToClassList("chroma-sub");
         titles.Add(title);
         titles.Add(sub);
-        titleRow.Add(logo);
         titleRow.Add(titles);
         header.Add(titleRow);
 
