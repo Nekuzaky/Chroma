@@ -176,25 +176,31 @@ public class ChromaConfig : ScriptableObject
 
     #region Migration
 
-    /// <summary>Run migrations if this config is older than the current version.</summary>
+    /// <summary>Run migrations if this config is older than the current version. Preserves all user settings.</summary>
     private void MigrateIfNeeded()
     {
-        const int CURRENT_VERSION = 1;
+        const int CURRENT_VERSION = 2;
         if (m_version >= CURRENT_VERSION) return;
 
-        // Future migrations go here:
-        // if (m_version < 2) MigrateV1ToV2();
-        // if (m_version < 3) MigrateV2ToV3();
+        // Migration chain: each version upgrades to the next
+        if (m_version < 2) MigrateV1ToV2();
 
         m_version = CURRENT_VERSION;
+        Debug.Log($"[Chroma] Config migrated to version {CURRENT_VERSION}. All user settings preserved.");
     }
 
-    /// <summary>Example: Add new fields with sensible defaults, keep old ones intact.</summary>
-    // private void MigrateV1ToV2()
-    // {
-    //     // New feature: m_newSetting ??= defaultValue;
-    //     // Old features remain untouched, so user config is preserved.
-    // }
+    /// <summary>Version 1→2: Added RGB themes (Halloween, Christmas, Valentine).</summary>
+    private void MigrateV1ToV2()
+    {
+        // Default: keep Classic theme (no change to user experience)
+        if (m_rgbTheme == RGBTheme.Classic) return;
+        Debug.Log("[Chroma] V1→V2: RGB themes added. Your current RGB mode is preserved.");
+    }
+
+    // FUTURE MIGRATIONS:
+    // if (m_version < 3) MigrateV2ToV3();
+    // if (m_version < 4) MigrateV3ToV4();
+    // ... and so on
 
     #endregion
 
