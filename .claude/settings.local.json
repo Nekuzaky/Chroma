@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "Skill(keybindings-help)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\Unity 6000.3.2f1\\\\Editor\\\\Unity.exe\" -ArgumentList \"-projectPath C:\\\\P\\\\Chroma\" -WindowStyle Normal)"
     ]
   }
 }
