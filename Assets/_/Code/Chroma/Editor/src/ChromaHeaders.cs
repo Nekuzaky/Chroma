@@ -255,21 +255,29 @@ public static class ChromaHeaders
                 break;
 
             case RGBTheme.Valentine:
-                // Cycle: Red (0) -> Pink (0.92) -> Magenta (0.83) -> Red
-                if (hue < 0.33f)
+                // ULTRA STRICT: Pure Red -> Pure Pink -> Pure Magenta (NO interpolation)
+                float valPhase = hue;
+                if (valPhase < 0.33f)
                 {
-                    hue = Mathf.Lerp(0f, 0.92f, hue / 0.33f);
+                    // Deep Red zone (pure red hue only)
+                    hue = 0f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(0.7f, 1f, valPhase / 0.33f);
                 }
-                else if (hue < 0.66f)
+                else if (valPhase < 0.66f)
                 {
-                    hue = Mathf.Lerp(0.92f, 0.83f, (hue - 0.33f) / 0.33f);
+                    // Hot Pink zone (pure pink hue only)
+                    hue = 0.92f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(1f, 1f, (valPhase - 0.33f) / 0.33f);
                 }
                 else
                 {
-                    hue = Mathf.Lerp(0.83f, 0f, (hue - 0.66f) / 0.33f);
+                    // Magenta zone (pure magenta hue only)
+                    hue = 0.83f;
+                    saturation = 1f;
+                    brightness = Mathf.Lerp(1f, 0.7f, (valPhase - 0.66f) / 0.33f);
                 }
-                saturation = 0.88f;
-                brightness = 0.95f;
                 break;
 
             case RGBTheme.Classic:
