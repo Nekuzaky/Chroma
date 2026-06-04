@@ -151,6 +151,7 @@
 .chroma-apply:disabled {
     background-color: rgba(127, 127, 127, 0.25);
     color: rgba(255, 255, 255, 0.5);
+    -unity-font-style: normal;
 }
 
 /* --- Native Settings foldouts --- */

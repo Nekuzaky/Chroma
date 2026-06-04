@@ -56,11 +56,16 @@ INSTALLATION
 Copy Assets/_/Code/Chroma into your project's Assets folder if you want.
 Self-contained with assembly definitions (Chroma.Runtime, Chroma.Editor).
 
-INSTALLATION UPDATE
--------------------
-Install via Unity Package Manager (recommended):
-  Window > Package Manager > + > Add package from git URL...
-  https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/Chroma
+INSTALLATION VIA GIT (RECOMMENDED)
+-----------------------------------
+Install via Unity Package Manager:
+  1. Window > Package Manager > + button
+  2. Select "Add package from git URL..."
+  3. Paste this URL:
+     https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code
+  4. Click "Add"
+
+This will install Chroma as a package in your project's Packages folder.
 
 
 FILE STRUCTURE
