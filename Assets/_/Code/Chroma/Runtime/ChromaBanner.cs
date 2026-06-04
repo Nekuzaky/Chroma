@@ -60,13 +60,6 @@ public class ChromaBanner : MonoBehaviour
     private void OnEnable() => Changed?.Invoke();
     private void OnDisable() => Changed?.Invoke();
     private void OnDestroy() => Changed?.Invoke();
-#else
-    // Runtime safeguard: prevent accidental usage in runtime code
-    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ValidateEditorOnly()
-    {
-        throw new System.InvalidOperationException("ChromaBanner.Changed is Editor-only. This component should be stripped from builds.");
-    }
 #endif
 
     #endregion
