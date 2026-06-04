@@ -1,4 +1,4 @@
-CHROMA 0.0.2
+CHROMA 0.2.0
 ================================================================================
 
 Editor-only Unity extension that color-codes your Hierarchy and Project folders
@@ -62,7 +62,7 @@ Install via Unity Package Manager:
   1. Window > Package Manager > + button
   2. Select "Add package from git URL..."
   3. Paste this URL:
-     https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code
+     https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/Chroma
   4. Click "Add"
 
 This will install Chroma as a package in your project's Packages folder.
