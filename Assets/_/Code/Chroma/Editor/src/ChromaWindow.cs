@@ -1056,6 +1056,7 @@ public class ChromaWindow : EditorWindow
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbSaturation"), new GUIContent("Saturation"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbValue"), new GUIContent("Brightness"));
             EditorGUILayout.PropertyField(_so.FindProperty("m_rgbAlpha"), new GUIContent("Opacity"));
+            EditorGUILayout.PropertyField(_so.FindProperty("m_rgbTheme"), new GUIContent("Theme", "Rainbow theme: Classic, Halloween, Christmas, or Valentine"));
         }
         EditorGUILayout.PropertyField(_so.FindProperty("m_rgbFolders"),
             new GUIContent("Rainbow folders", "Also animate Project window folder icons"));

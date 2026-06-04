@@ -7,6 +7,7 @@ namespace Chroma.Editor
 public enum ChildInheritMode { Flat, DepthFade }
 public enum AutoColorMatch { Tag, Layer, NamePrefix, Regex }
 public enum SeparatorStyle { Solid, Dashed, Dotted, Double }
+public enum RGBTheme { Classic, Halloween, Christmas, Valentine }
 
 /// <summary>
 /// Persisted Chroma configuration asset. Controls hierarchy and folder colors, tree lines, separators,
@@ -148,6 +149,8 @@ public class ChromaConfig : ScriptableObject
     public float m_rgbSpread = 0.004f;
     [Tooltip("Also animate Project-window folder icons through the rainbow")]
     public bool m_rgbFolders = false;
+    [Tooltip("RGB theme: Classic rainbow, Halloween, Christmas, or Valentine")]
+    public RGBTheme m_rgbTheme = RGBTheme.Classic;
 
     [Tooltip("Quick color presets that can be applied as banner styles")]
     public List<Preset> m_presets = new List<Preset>();

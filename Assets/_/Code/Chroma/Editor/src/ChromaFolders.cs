@@ -43,9 +43,16 @@ public static class ChromaFolders
         if (rgb)
         {
             // Rainbow mode: every folder cycles through the hue wheel (overrides assigned colors).
+            float speed = cfg.m_rgbSpeed;
+            if (cfg.m_rgbTheme != RGBTheme.Classic) speed *= 0.7f; // Reduce speed by 30% for themed modes
+
             float hue = Mathf.Repeat(
-                (float)(EditorApplication.timeSinceStartup * cfg.m_rgbSpeed) + rect.y * cfg.m_rgbSpread, 1f);
-            col = Color.HSVToRGB(hue, cfg.m_rgbSaturation, cfg.m_rgbValue);
+                (float)(EditorApplication.timeSinceStartup * speed) + rect.y * cfg.m_rgbSpread, 1f);
+            float saturation = cfg.m_rgbSaturation;
+            float brightness = cfg.m_rgbValue;
+
+            ChromaHeaders.ApplyRgbTheme(cfg.m_rgbTheme, ref hue, ref saturation, ref brightness);
+            col = Color.HSVToRGB(hue, saturation, brightness);
         }
         else
         {
