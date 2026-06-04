@@ -1325,6 +1325,16 @@ public class ChromaWindow : EditorWindow
     {
         string path = EditorUtility.OpenFilePanel("Import Chroma config", "", "json");
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+
+        // Security: Validate path is a safe location (Assets, Library, ProjectSettings, or temp)
+        string fullPath = System.IO.Path.GetFullPath(path);
+        string projectPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, ".."));
+        if (!fullPath.StartsWith(projectPath, System.StringComparison.OrdinalIgnoreCase))
+        {
+            EditorUtility.DisplayDialog("Chroma", "Import rejected: File must be inside the project folder.", "OK");
+            return;
+        }
+
         try
         {
             string json = File.ReadAllText(path);

@@ -39,11 +39,23 @@ public static class ChromaHeaders
 
     static ChromaHeaders()
     {
+        // Prevent duplicate subscriptions on assembly reload
+        EditorApplication.hierarchyWindowItemOnGUI -= OnHierarchyGUI;
         EditorApplication.hierarchyWindowItemOnGUI += OnHierarchyGUI;
+
+        AssemblyReloadEvents.beforeAssemblyReload -= ClearHeaderCache;
+        AssemblyReloadEvents.beforeAssemblyReload -= ClearComponentCache;
+        EditorApplication.hierarchyChanged -= ClearComponentCache;
+#if UNITY_EDITOR
+        ChromaBanner.Changed -= OnComponentChanged;
+#endif
+
         AssemblyReloadEvents.beforeAssemblyReload += ClearHeaderCache;
         AssemblyReloadEvents.beforeAssemblyReload += ClearComponentCache;
         EditorApplication.hierarchyChanged += ClearComponentCache;
+#if UNITY_EDITOR
         ChromaBanner.Changed += OnComponentChanged;
+#endif
         EditorApplication.delayCall += () => EnsureRgbPump(Config);
     }
 
@@ -287,8 +299,8 @@ public static class ChromaHeaders
 
             if (lower.StartsWith("text:") || lower.StartsWith("t:"))
             {
-                string c = token.Substring(token.IndexOf(':') + 1);
-                if (TryGetColor(c, out Color tc)) { e.m_textColor = tc; e.m_textToken = token; }
+                string c = ExtractAfterSeparator(token, ':');
+                if (!string.IsNullOrEmpty(c) && TryGetColor(c, out Color tc)) { e.m_textColor = tc; e.m_textToken = token; }
                 continue;
             }
 
@@ -611,7 +623,7 @@ public static class ChromaHeaders
             r.m_cachedRegexFor = r.m_value;
             try
             {
-                r.m_cachedRegex = new System.Text.RegularExpressions.Regex(r.m_value, System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan.FromMilliseconds(100));
+                r.m_cachedRegex = new System.Text.RegularExpressions.Regex(r.m_value, System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan.FromMilliseconds(500));
             }
             catch (ArgumentException)
             {
@@ -893,8 +905,8 @@ public static class ChromaHeaders
 
             if (lower.StartsWith("text:") || lower.StartsWith("t:"))
             {
-                string c = token.Substring(token.IndexOf(':') + 1);
-                if (TryGetColor(c, out Color tc)) info.m_textColor = tc;
+                string c = ExtractAfterSeparator(token, ':');
+                if (!string.IsNullOrEmpty(c) && TryGetColor(c, out Color tc)) info.m_textColor = tc;
                 continue;
             }
 
@@ -970,6 +982,12 @@ public static class ChromaHeaders
 
         tex.Apply();
         return tex;
+    }
+
+    private static string ExtractAfterSeparator(string text, char separator)
+    {
+        int idx = text.IndexOf(separator);
+        return idx >= 0 && idx < text.Length - 1 ? text.Substring(idx + 1) : "";
     }
 
     internal static bool TryGetColor(string value, out Color color)
