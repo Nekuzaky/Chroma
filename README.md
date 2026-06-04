@@ -35,10 +35,8 @@ auto-coloring rules and more, with **zero runtime cost**.
 and paste:
 
 ```
-https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/Chroma
+https://github.com/Nekuzaky/Chroma.git?path=Assets/_/Code/
 ```
-
-**Or copy the folder** — drop `Assets/_/Code/Chroma` into your project's `Assets`.
 
 Either way it is self-contained, with its own assembly definitions (`Chroma.Runtime`, `Chroma.Editor`).
 
