@@ -10,13 +10,39 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e6741afe-6a45-440f-8d38-89f3187cdbb5" name="Changes" comment="" />
+    <list default="true" id="e6741afe-6a45-440f-8d38-89f3187cdbb5" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaWindow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaWindow.uss" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaWindow.uss" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ProjectSettings/ProjectSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/ProjectSettings.asset" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="33122" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "Nekuzaky"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/Nekuzaky/Chroma.git",
+    "accountId": "5020659d-bd36-49e4-bd8f-1618c2efcde3"
+  }
+}]]></component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/Assets/_/Code/Chroma/Editor/src/ChromaWindow.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/_/Code/Chroma/Tests/ChromaParsingTests.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="McpProjectServerCommands">
@@ -25,23 +51,23 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.000000113563299" />
-      <entry key="MS500" value="1.0408375807949515" />
-      <entry key="S2" value="1.4951096474162813" />
-      <entry key="S5" value="2.156288137465501" />
-      <entry key="S10" value="2.7756445346545133" />
-      <entry key="S30" value="3.533573815160767" />
-      <entry key="S60" value="4.184269751608877" />
-      <entry key="M2" value="5.377893730138252" />
-      <entry key="M5" value="8.290693617509572" />
-      <entry key="M10" value="14.320569777904836" />
-      <entry key="M15" value="19.383847833502138" />
-      <entry key="M30" value="28.0317341630935" />
-      <entry key="H1" value="34.48634855782192" />
-      <entry key="H2" value="38.44775022543406" />
-      <entry key="H4" value="40.64463876689169" />
-      <entry key="D1" value="42.59594559524175" />
-      <entry key="W1" value="42.941989841696895" />
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0000000000000522" />
+      <entry key="S2" value="1.0004780814113163" />
+      <entry key="S5" value="1.0478503221832454" />
+      <entry key="S10" value="1.2570850247661012" />
+      <entry key="S30" value="3.5558511158688146" />
+      <entry key="S60" value="14.32453575691824" />
+      <entry key="M2" value="41.93687677592014" />
+      <entry key="M5" value="96.3226196321561" />
+      <entry key="M10" value="135.80448927138772" />
+      <entry key="M15" value="155.76094449246457" />
+      <entry key="M30" value="183.34369274068266" />
+      <entry key="H1" value="202.0411138990621" />
+      <entry key="H2" value="213.23129683460817" />
+      <entry key="H4" value="219.39863284591343" />
+      <entry key="D1" value="224.86778017510906" />
+      <entry key="W1" value="225.8374453874012" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -63,32 +89,91 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.9526381069811354" />
-      <entry key="MS500" value="1.030842183708807" />
-      <entry key="S2" value="1.4916179723796892" />
-      <entry key="S5" value="2.1541381428736264" />
-      <entry key="S10" value="2.774159959561271" />
-      <entry key="S30" value="3.532905499818894" />
-      <entry key="S60" value="4.183879243461201" />
-      <entry key="M2" value="5.377654909965667" />
-      <entry key="M5" value="8.29055722415671" />
-      <entry key="M10" value="14.320459122538198" />
-      <entry key="M15" value="19.38375025615696" />
-      <entry key="M30" value="28.031665031597495" />
-      <entry key="H1" value="34.48630639787366" />
-      <entry key="H2" value="38.44772681473418" />
-      <entry key="H4" value="40.64462641522015" />
-      <entry key="D1" value="42.59594344094748" />
-      <entry key="W1" value="42.94198953151649" />
+      <entry key="MS100" value="0.17434295829380067" />
+      <entry key="MS500" value="0.7051489802422034" />
+      <entry key="S2" value="0.9166731099808378" />
+      <entry key="S5" value="1.0057438766431956" />
+      <entry key="S10" value="1.2206418935724963" />
+      <entry key="S30" value="3.5301331669927287" />
+      <entry key="S60" value="14.307450537277921" />
+      <entry key="M2" value="41.92565890732017" />
+      <entry key="M5" value="96.31438618225546" />
+      <entry key="M10" value="135.7981049557953" />
+      <entry key="M15" value="155.75583959484047" />
+      <entry key="M30" value="183.340573609018" />
+      <entry key="H1" value="202.0393771891467" />
+      <entry key="H2" value="213.2303787155212" />
+      <entry key="H4" value="219.3981605787626" />
+      <entry key="D1" value="224.86769956014223" />
+      <entry key="W1" value="225.8374338234182" />
     </decayedShown>
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 6
+}]]></component>
+  <component name="ProjectId" id="3Ef31PRGxKwVC7oVSRO8BYN4Gry" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "node.js.selected.package.tslint": "(autodetect)"
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "cidr.known.project.marker": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "develop",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="e6741afe-6a45-440f-8d38-89f3187cdbb5" name="Changes" comment="" />
+      <created>1780555581734</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1780555581734</updated>
+      <workItem from="1780555582848" duration="1056000" />
+    </task>
     <servers />
   </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
+  <component name="UnityProjectDiscoverer">
+    <option name="unityProjectFolder" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <breakpoint enabled="true" type="DotNet_Exception_Breakpoints">
+          <properties exception="System.OperationCanceledException" breakIfHandledByOtherCode="false" displayValue="System.OperationCanceledException" />
+          <option name="timeStamp" value="1" />
+        </breakpoint>
+        <breakpoint enabled="true" type="DotNet_Exception_Breakpoints">
+          <properties exception="System.Threading.Tasks.TaskCanceledException" breakIfHandledByOtherCode="false" displayValue="System.Threading.Tasks.TaskCanceledException" />
+          <option name="timeStamp" value="2" />
+        </breakpoint>
+        <breakpoint enabled="true" type="DotNet_Exception_Breakpoints">
+          <properties exception="System.Threading.ThreadAbortException" breakIfHandledByOtherCode="false" displayValue="System.Threading.ThreadAbortException" />
+          <option name="timeStamp" value="3" />
+        </breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
 </project>

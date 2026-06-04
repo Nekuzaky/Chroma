@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: ChromaConfig
   m_EditorClassIdentifier: Chroma.Editor::Chroma.Editor.ChromaConfig
   m_enableHeaders: 1
+  m_bannerFont: {fileID: 0}
+  m_bannerFontName: 
   m_enableTreeLines: 1
   m_treeLineColor: {r: 1, g: 1, b: 1, a: 0.1}
   m_showChildCount: 0
   m_zebra: 0
   m_zebraColor: {r: 1, g: 1, b: 1, a: 0.03}
+  m_warnMissingScripts: 1
   m_enableFolderColors: 1
   m_folderColors:
   - m_guid: 75126c0ff8606b2469a99aef4ecff2d4
@@ -53,4 +56,4 @@ MonoBehaviour:
     m_spec: '#33363a left bold text:white'
   - m_key: grad
     m_spec: '#3a3f44>#2c2f33 center bold text:white'
-  m_version: 2184
+  m_version: 2188
