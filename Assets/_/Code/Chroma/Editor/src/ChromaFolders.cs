@@ -57,7 +57,19 @@ public static class ChromaFolders
         else
         {
             EnsureCache(cfg);
-            if (!_colors.TryGetValue(guid, out col)) return;
+            if (!_colors.TryGetValue(guid, out col))
+            {
+                // Try to inherit color from parent folder
+                if (cfg.m_folderColorInheritance)
+                {
+                    col = TryGetParentColor(guid, cfg);
+                    if (col == Color.clear) return;
+                }
+                else
+                {
+                    return;
+                }
+            }
         }
 
         Texture icon = FolderIcon(guid);
@@ -79,6 +91,36 @@ public static class ChromaFolders
         GUI.color = col;
         GUI.DrawTexture(iconRect, icon, ScaleMode.ScaleToFit);
         GUI.color = prev;
+    }
+
+    #endregion
+
+
+    #region Folder Inheritance
+
+    /// <summary>Try to find and apply parent folder's color. Returns Color.clear if no parent color found.</summary>
+    private static Color TryGetParentColor(string childGuid, ChromaConfig cfg)
+    {
+        string childPath = AssetDatabase.GUIDToAssetPath(childGuid);
+        if (string.IsNullOrEmpty(childPath) || !AssetDatabase.IsValidFolder(childPath))
+            return Color.clear;
+
+        // Get parent directory path
+        string parentPath = System.IO.Path.GetDirectoryName(childPath);
+        if (string.IsNullOrEmpty(parentPath) || parentPath == "Assets")
+            return Color.clear;
+
+        // Get parent folder GUID
+        string parentGuid = AssetDatabase.AssetPathToGUID(parentPath);
+        if (string.IsNullOrEmpty(parentGuid))
+            return Color.clear;
+
+        // Look up parent color
+        if (_colors.TryGetValue(parentGuid, out Color parentColor))
+            return parentColor;
+
+        // Recursively check grandparent
+        return TryGetParentColor(parentGuid, cfg);
     }
 
     #endregion

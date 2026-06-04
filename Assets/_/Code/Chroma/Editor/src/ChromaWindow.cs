@@ -16,7 +16,7 @@ namespace Chroma.Editor
 /// </summary>
 public class ChromaWindow : EditorWindow
 {
-    private enum Tab { Selection, Settings }
+    private enum Tab { Selection, Search, Settings }
     private enum OutputMode { Name, Component }
     private enum SelSource { None, NameBanner, Component }
 
@@ -87,7 +87,7 @@ public class ChromaWindow : EditorWindow
         // --- Tab bar ---
         var tabbar = new VisualElement();
         tabbar.AddToClassList("chroma-tabbar");
-        _tabButtons = new[] { MakeTab("Selection", Tab.Selection), MakeTab("Settings", Tab.Settings) };
+        _tabButtons = new[] { MakeTab("Selection", Tab.Selection), MakeTab("Search", Tab.Search), MakeTab("Settings", Tab.Settings) };
         tabbar.Add(_tabButtons[0]);
         tabbar.Add(_tabButtons[1]);
         root.Add(tabbar);
@@ -275,7 +275,8 @@ public class ChromaWindow : EditorWindow
     {
         if (_tabButtons == null) return;
         _tabButtons[0].EnableInClassList("chroma-tab--active", _tab == Tab.Selection);
-        _tabButtons[1].EnableInClassList("chroma-tab--active", _tab == Tab.Settings);
+        _tabButtons[1].EnableInClassList("chroma-tab--active", _tab == Tab.Search);
+        _tabButtons[2].EnableInClassList("chroma-tab--active", _tab == Tab.Settings);
     }
 
     /// <summary>Locate the window's USS stylesheet by name, wherever the Chroma folder lives.</summary>
@@ -1079,6 +1080,20 @@ public class ChromaWindow : EditorWindow
             EditorApplication.RepaintProjectWindow();
         }
 
+        using (new EditorGUI.IndentLevelScope())
+        {
+            bool inherit = EditorGUILayout.Toggle("Child folders inherit parent color", _config.m_folderColorInheritance);
+            if (inherit != _config.m_folderColorInheritance)
+            {
+                Undo.RecordObject(_config, "Chroma: toggle folder color inheritance");
+                _config.m_folderColorInheritance = inherit;
+                _config.m_version++;
+                EditorUtility.SetDirty(_config);
+                ChromaFolders.Invalidate();
+                EditorApplication.RepaintProjectWindow();
+            }
+        }
+
         List<string> folders = SelectedFolderGuids();
         EditorGUILayout.BeginHorizontal();
         _folderPickColor = EditorGUILayout.ColorField(GUIContent.none, _folderPickColor, false, false, false, GUILayout.Width(50));
@@ -1121,13 +1136,30 @@ public class ChromaWindow : EditorWindow
     private List<string> SelectedFolderGuids()
     {
         var guids = new List<string>();
-        UnityEngine.Object[] objs = Selection.objects;
-        if (objs == null) return guids;
-        foreach (UnityEngine.Object o in objs)
+
+        // Check project window selections (folders and assets)
+        string[] selectedGuids = Selection.assetGUIDs;
+        foreach (string guid in selectedGuids)
         {
-            string path = AssetDatabase.GetAssetPath(o);
+            string path = AssetDatabase.GUIDToAssetPath(guid);
             if (!string.IsNullOrEmpty(path) && AssetDatabase.IsValidFolder(path))
-                guids.Add(AssetDatabase.AssetPathToGUID(path));
+                guids.Add(guid);
+        }
+
+        // Also check scene selections for compatibility
+        UnityEngine.Object[] objs = Selection.objects;
+        if (objs != null)
+        {
+            foreach (UnityEngine.Object o in objs)
+            {
+                string path = AssetDatabase.GetAssetPath(o);
+                if (!string.IsNullOrEmpty(path) && AssetDatabase.IsValidFolder(path))
+                {
+                    string guid = AssetDatabase.AssetPathToGUID(path);
+                    if (!guids.Contains(guid))
+                        guids.Add(guid);
+                }
+            }
         }
         return guids;
     }
@@ -1492,7 +1524,12 @@ public class ChromaWindow : EditorWindow
     // UI Toolkit chrome.
     private Button[] _tabButtons;
     private VisualElement _selectionRoot;
+    private VisualElement _searchRoot;
     private VisualElement _settingsRoot;
+
+    private string _searchQuery = "";
+    private List<GameObject> _searchResults = new List<GameObject>();
+    private Vector2 _searchScroll;
     private List<IMGUIContainer> _settingsBodies;
     private IMGUIContainer _selExtras;
     private bool _refreshing;
