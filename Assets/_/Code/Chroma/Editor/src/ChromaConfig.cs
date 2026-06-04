@@ -286,6 +286,68 @@ public class ChromaConfig : ScriptableObject
 
     #region Tools and Utilities
 
+    /// <summary>Validate and clamp all deserialized values to safe ranges. Call after FromJsonOverwrite.</summary>
+    public void ValidateAndClamp()
+    {
+        const int maxStringLen = 1000;
+        const int maxRegexLen = 100;
+        const int maxRules = 256;
+
+        // Clamp numeric ranges
+        m_childInheritOpacity = Mathf.Clamp01(m_childInheritOpacity);
+        m_childInheritFalloff = Mathf.Clamp01(m_childInheritFalloff);
+        m_rgbSpeed = Mathf.Clamp(m_rgbSpeed, 0.05f, 3f);
+        m_rgbSaturation = Mathf.Clamp01(m_rgbSaturation);
+        m_rgbValue = Mathf.Clamp01(m_rgbValue);
+        m_rgbAlpha = Mathf.Clamp(m_rgbAlpha, 0.02f, 0.8f);
+        m_rgbSpread = Mathf.Clamp(m_rgbSpread, 0f, 0.02f);
+
+        // Validate banner font name
+        if (!string.IsNullOrEmpty(m_bannerFontName) && m_bannerFontName.Length > maxStringLen)
+            m_bannerFontName = m_bannerFontName.Substring(0, maxStringLen);
+
+        // Validate folder colors
+        if (m_folderColors == null) m_folderColors = new List<FolderColor>();
+        for (int i = m_folderColors.Count - 1; i >= 0; i--)
+        {
+            if (m_folderColors[i] == null || string.IsNullOrEmpty(m_folderColors[i].m_guid) || m_folderColors[i].m_guid.Length != 36)
+                m_folderColors.RemoveAt(i);
+        }
+
+        // Validate and limit auto-color rules
+        if (m_autoColorRules == null) m_autoColorRules = new List<AutoColorRule>();
+        if (m_autoColorRules.Count > maxRules) m_autoColorRules.RemoveRange(maxRules, m_autoColorRules.Count - maxRules);
+
+        for (int i = 0; i < m_autoColorRules.Count; i++)
+        {
+            var rule = m_autoColorRules[i];
+            if (rule == null) continue;
+
+            // Clamp regex pattern length to prevent ReDoS
+            if (!string.IsNullOrEmpty(rule.m_value) && rule.m_value.Length > maxRegexLen)
+                rule.m_value = rule.m_value.Substring(0, maxRegexLen);
+
+            // Clear cached regex to force recompilation with new timeout
+            rule.m_cachedRegex = null;
+            rule.m_cachedRegexFor = null;
+            rule.m_cachedLayer = 0;
+            rule.m_cachedLayerFor = null;
+        }
+
+        // Validate presets
+        if (m_presets == null) m_presets = new List<Preset>();
+        for (int i = m_presets.Count - 1; i >= 0; i--)
+        {
+            var p = m_presets[i];
+            if (p == null || string.IsNullOrEmpty(p.m_key))
+            {
+                m_presets.RemoveAt(i);
+                continue;
+            }
+            if (p.m_key.Length > 100) p.m_key = p.m_key.Substring(0, 100);
+            if (p.m_spec.Length > maxStringLen) p.m_spec = p.m_spec.Substring(0, maxStringLen);
+        }
+    }
 
     #endregion
 
