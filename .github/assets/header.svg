@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220" role="img" aria-label="Chroma - color-code your Unity Hierarchy">
+  <defs>
+    <!-- Animated rainbow gradient for the title -->
+    <linearGradient id="rgb" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"  stop-color="#ff0040">
+        <animate attributeName="stop-color"
+          values="#ff0040;#ff8c00;#ffe000;#00d563;#00b3ff;#7a5cff;#ff00c8;#ff0040"
+          dur="6s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="50%" stop-color="#00b3ff">
+        <animate attributeName="stop-color"
+          values="#00b3ff;#7a5cff;#ff00c8;#ff0040;#ff8c00;#ffe000;#00d563;#00b3ff"
+          dur="6s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#00d563">
+        <animate attributeName="stop-color"
+          values="#00d563;#00b3ff;#7a5cff;#ff00c8;#ff0040;#ff8c00;#ffe000;#00d563"
+          dur="6s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+    <!-- Animated gradient for the underline bar (offset phase) -->
+    <linearGradient id="rgbBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff8c00">
+        <animate attributeName="stop-color"
+          values="#ff8c00;#ffe000;#00d563;#00b3ff;#7a5cff;#ff00c8;#ff0040;#ff8c00"
+          dur="6s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#7a5cff">
+        <animate attributeName="stop-color"
+          values="#7a5cff;#ff00c8;#ff0040;#ff8c00;#ffe000;#00d563;#00b3ff;#7a5cff"
+          dur="6s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="220" rx="16" fill="#0d1117" />
+
+  <!-- Title -->
+  <text x="450" y="110" text-anchor="middle"
+        font-family="Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="84" font-weight="800" letter-spacing="2"
+        fill="url(#rgb)">Chroma</text>
+
+  <!-- Animated underline bar -->
+  <rect x="300" y="132" width="300" height="6" rx="3" fill="url(#rgbBar)">
+    <animate attributeName="width" values="0;300;300" keyTimes="0;0.6;1" dur="2s" begin="0s" fill="freeze" />
+    <animate attributeName="x" values="450;300;300" keyTimes="0;0.6;1" dur="2s" begin="0s" fill="freeze" />
+  </rect>
+
+  <!-- Subtitle -->
+  <text x="450" y="172" text-anchor="middle"
+        font-family="Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="20" font-weight="500" letter-spacing="1"
+        fill="#8b949e">Color-code your Unity Hierarchy &#8226; Editor-only &#8226; Zero runtime cost</text>
+</svg>
