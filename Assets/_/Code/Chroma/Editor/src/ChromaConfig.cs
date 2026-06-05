@@ -272,24 +272,13 @@ public class ChromaConfig : ScriptableObject
         return cfg;
     }
 
-    /// <summary>Find or create the asset folder for Chroma config. Prefers the Chroma script directory; falls back to Assets/Editor/Chroma/.</summary>
+    /// <summary>Find or create the asset folder for Chroma config. Prefers Assets/Chroma; falls back to the Chroma script directory.</summary>
     private static string FindAssetFolder()
     {
-        string[] scriptGuids = AssetDatabase.FindAssets("ChromaHeaders t:Script");
-        for (int i = 0; i < scriptGuids.Length; i++)
-        {
-            string p = AssetDatabase.GUIDToAssetPath(scriptGuids[i]);
-            if (string.IsNullOrEmpty(p) || !p.StartsWith("Assets/")) continue;
-            string dir = System.IO.Path.GetDirectoryName(p);
-            if (string.IsNullOrEmpty(dir)) continue;
-            return dir.Replace('\\', '/');
-        }
-
-        if (!AssetDatabase.IsValidFolder("Assets/Editor"))
-            AssetDatabase.CreateFolder("Assets", "Editor");
-        if (!AssetDatabase.IsValidFolder("Assets/Editor/Chroma"))
-            AssetDatabase.CreateFolder("Assets/Editor", "Chroma");
-        return "Assets/Editor/Chroma";
+        // Always use Assets/Chroma as the default config location
+        if (!AssetDatabase.IsValidFolder("Assets/Chroma"))
+            AssetDatabase.CreateFolder("Assets", "Chroma");
+        return "Assets/Chroma";
     }
 
     #endregion
