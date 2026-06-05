@@ -1,9 +1,22 @@
 # Chroma
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Unity 2021.3+](https://img.shields.io/badge/Unity-2021.3%2B-100000?style=flat&logo=unity&logoColor=white)](https://unity.com/)
 [![C#](https://img.shields.io/badge/C%23-239120?style=flat&logo=csharp&logoColor=white)](https://docs.microsoft.com/en-us/dotnet/csharp/)
-[![Unity](https://img.shields.io/badge/Unity-100000?style=flat&logo=unity&logoColor=white)](https://unity.com/)
+[![Editor Only](https://img.shields.io/badge/Editor--only-zero%20runtime%20cost-brightgreen)](#requirements)
 
 Editor-only Unity extension that color-codes your **Hierarchy** and **Project-window folders** to keep large scenes readable — with **zero runtime cost**.
+
+## Table of Contents
+
+- [Features](#features)
+- [How to Use](#how-to-use)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Contributing](#contributing)
+- [Found a Bug?](#found-a-bug)
+- [Changelog](#changelog)
+- [License](#license)
 
 ## Features
 
@@ -109,17 +122,19 @@ Copy `Assets/_/Code/Chroma` into your project's `Assets` folder.
 - Unity 2021.3 LTS or newer (works on Unity 6)
 - Editor-only — no impact on runtime or builds
 
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines on reporting issues, proposing features, and submitting pull requests. By participating, you agree to abide by our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+
 ## Found a Bug?
 
-Report issues to:
+Open an [issue](https://github.com/Nekuzaky/Chroma/issues) or reach out:
 - **Email**: contact@nekuzaky.com
 - **Website**: https://www.nekuzaky.com/contact
 
 ## Changelog
 
-### v0.1.0
-- **Auto-creation of ChromaConfig**: The ChromaConfig asset is now automatically created in `Assets/Chroma/` when the project loads, eliminating the need to open Tools > Chroma first.
-- **Team-friendly storage**: Config file is stored in Git-friendly YAML format for seamless collaboration — all team members get the same Chroma settings.
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ## License
 
