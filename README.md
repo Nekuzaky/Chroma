@@ -115,6 +115,12 @@ Report issues to:
 - **Email**: contact@nekuzaky.com
 - **Website**: https://www.nekuzaky.com/contact
 
+## Changelog
+
+### v0.1.0
+- **Auto-creation of ChromaConfig**: The ChromaConfig asset is now automatically created in `Assets/Chroma/` when the project loads, eliminating the need to open Tools > Chroma first.
+- **Team-friendly storage**: Config file is stored in Git-friendly YAML format for seamless collaboration — all team members get the same Chroma settings.
+
 ## License
 
 MIT License — see [LICENSE](LICENSE) file for details.
