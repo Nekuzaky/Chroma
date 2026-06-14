@@ -129,6 +129,8 @@ public static class ChromaLinter
                 r.m_cachedAssertRegexFor = null;
                 r.m_cachedLayerFor = null;
                 r.m_cachedIntFor = null;
+                r.m_cachedRuleId = null;
+                r.m_cachedMessage = null;
             }
         }
         RequestRescan();
@@ -316,10 +318,17 @@ public static class ChromaLinter
             if (!ScopeMatches(r, go, name)) continue;
             if (AssertHolds(r, go, name, depth)) continue;
 
+            // Resolve display strings once per rule (m_assert.ToString() boxes the enum); reused
+            // across every object this rule flags during the scan.
+            if (r.m_cachedRuleId == null)
+                r.m_cachedRuleId = string.IsNullOrEmpty(r.m_id) ? r.m_assert.ToString() : r.m_id;
+            if (r.m_cachedMessage == null)
+                r.m_cachedMessage = string.IsNullOrEmpty(r.m_message) ? DefaultMessage(r) : r.m_message;
+
             results.Add(new Violation
             {
-                m_ruleId = string.IsNullOrEmpty(r.m_id) ? r.m_assert.ToString() : r.m_id,
-                m_message = string.IsNullOrEmpty(r.m_message) ? DefaultMessage(r) : r.m_message,
+                m_ruleId = r.m_cachedRuleId,
+                m_message = r.m_cachedMessage,
                 m_severity = r.m_severity
             });
         }

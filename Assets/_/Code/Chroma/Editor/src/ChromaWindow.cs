@@ -1377,7 +1377,9 @@ public class ChromaWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal();
 
-        bool apply = GUILayout.Button(new GUIContent(label, tooltip), GUILayout.Height(24), GUILayout.Width(120));
+        if (!_themeRowContent.TryGetValue(label, out GUIContent gc))
+            _themeRowContent[label] = gc = new GUIContent(label, tooltip);
+        bool apply = GUILayout.Button(gc, GUILayout.Height(24), GUILayout.Width(120));
 
         Color[] palette = ThemeSwatches(key);
         Rect strip = GUILayoutUtility.GetRect(10f, 24f, GUILayout.ExpandWidth(true));
@@ -1396,8 +1398,14 @@ public class ChromaWindow : EditorWindow
     }
 
     /// <summary>The representative swatch colors for a theme key (h1, h2, h3, category), for previewing.</summary>
+    // Theme palettes are compile-time constants — parse each once and reuse (the Themes body
+    // repaints continuously on hover because wantsMouseMove is on).
+    private static readonly Dictionary<string, Color[]> _swatchCache = new Dictionary<string, Color[]>();
+    private static readonly Dictionary<string, GUIContent> _themeRowContent = new Dictionary<string, GUIContent>();
+
     private static Color[] ThemeSwatches(string theme)
     {
+        if (_swatchCache.TryGetValue(theme, out Color[] cachedCols)) return cachedCols;
         string[] hex;
         switch (theme)
         {
@@ -1421,6 +1429,7 @@ public class ChromaWindow : EditorWindow
         }
         var cols = new Color[hex.Length];
         for (int i = 0; i < hex.Length; i++) ChromaHeaders.TryGetColor(hex[i], out cols[i]);
+        _swatchCache[theme] = cols;
         return cols;
     }
 

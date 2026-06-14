@@ -61,7 +61,24 @@ public static class ChromaHeaders
         ObjectChangeEvents.changesPublished -= OnObjectChanges;
         ObjectChangeEvents.changesPublished += OnObjectChanges;
 
-        EditorApplication.delayCall += () => EnsureRgbPump(Config);
+        // Cache the selection set so the per-row accent is an O(1) managed lookup, not a native
+        // Selection.Contains call per row per repaint.
+        Selection.selectionChanged -= RebuildSelectionSet;
+        Selection.selectionChanged += RebuildSelectionSet;
+
+        EditorApplication.delayCall += () =>
+        {
+            EnsureRgbPump(Config);
+            RebuildSelectionSet();
+        };
+    }
+
+    private static void RebuildSelectionSet()
+    {
+        _selectedIds.Clear();
+        int[] ids = Selection.instanceIDs;
+        for (int i = 0; i < ids.Length; i++) _selectedIds.Add(ids[i]);
+        EditorApplication.RepaintHierarchyWindow(); // refresh the accent
     }
 
     /// <summary>Renders colored banners, separators, tree lines, and tints for a single hierarchy row.</summary>
@@ -134,7 +151,7 @@ public static class ChromaHeaders
         // Selection accent: wash the theme color over the selected row. Drawn after the banner/
         // tint (so it stays visible on banner rows, which otherwise hide the native blue highlight)
         // but before the right-side icons (so it doesn't tint them). Blends over, never covers.
-        if (cfg.m_selectionAccent && cfg.m_selectionAccentColor.a > 0.001f && Selection.Contains(instanceID))
+        if (cfg.m_selectionAccent && cfg.m_selectionAccentColor.a > 0.001f && _selectedIds.Contains(instanceID))
             EditorGUI.DrawRect(new Rect(selectionRect.x, selectionRect.y, selectionRect.width + RowExtra, selectionRect.height), cfg.m_selectionAccentColor);
 
         // Right-side indicators, drawn last so a banner / separator / tint never hides them.
@@ -195,12 +212,18 @@ public static class ChromaHeaders
     {
         _configCache = cfg;
         _presetCache = null;
+        _bannerFontCached = false; // font asset / system-font name may have changed
         ClearHeaderCache();
         ClearComponentCache(); // icon count / widget options may have changed
         InvalidateAutoColorCache(cfg);
         EnsureRgbPump(cfg);
         ChromaLinter.OnConfigChanged(cfg);
+        ChromaSceneView.MarkDirty();      // preset/banner colors may have changed
         EditorApplication.RepaintHierarchyWindow();
+        // Only repaint scene views when the Scene View feature is actually on (avoid a global
+        // repaint on every config edit for users who never enable labels/gizmos).
+        if (cfg != null && (cfg.m_sceneLabels || cfg.m_sceneGizmos))
+            SceneView.RepaintAll();
     }
 
     /// <summary>Subscribe/unsubscribe the RGB pump based on whether RGB mode is enabled. Throttled to ~30fps.</summary>
@@ -331,6 +354,119 @@ public static class ChromaHeaders
                     brightness = Mathf.Lerp(1f, 0.7f, (valPhase - 0.66f) / 0.33f);
                 }
                 break;
+
+            case RGBTheme.Matrix:
+            {
+                // Digital rain: green only; brightness forms bright→dark trails across rows/time.
+                float p = hue;
+                hue = 0.34f;
+                saturation = 1f;
+                brightness = Mathf.Lerp(0.18f, 1f, Mathf.Abs(p * 2f - 1f)); // bright at 0/1, dark at 0.5
+                break;
+            }
+
+            case RGBTheme.Corrupted:
+            {
+                // Glitch: hard jumps between harsh hues with black dropouts (no interpolation).
+                float p = hue;
+                saturation = 1f;
+                if (p < 0.20f)      { hue = 0.83f; brightness = 1f; }    // magenta
+                else if (p < 0.32f) { hue = 0f;    brightness = 0.05f; } // black dropout
+                else if (p < 0.52f) { hue = 0.5f;  brightness = 1f; }    // cyan
+                else if (p < 0.60f) { hue = 0f;    brightness = 0.05f; } // black dropout
+                else if (p < 0.82f) { hue = 0f;    brightness = 1f; }    // red
+                else                { hue = 0f;    brightness = 0.05f; } // black dropout
+                break;
+            }
+
+            case RGBTheme.Funny:
+            {
+                // Goofy blocky rainbow: quantized bright cartoon hues.
+                float p = hue;
+                hue = Mathf.Floor(p * 6f) / 6f;
+                saturation = 0.95f;
+                brightness = 1f;
+                break;
+            }
+
+            case RGBTheme.FastFood:
+            {
+                // Flame-grill palette: red → orange → yellow with a dark-green accent.
+                float p = hue;
+                saturation = 1f;
+                brightness = 1f;
+                if (p < 0.40f)      hue = 0.00f;                        // red
+                else if (p < 0.68f) hue = 0.07f;                        // orange
+                else if (p < 0.86f) hue = 0.13f;                        // yellow
+                else                { hue = 0.33f; brightness = 0.45f; } // dark green accent
+                break;
+            }
+
+            case RGBTheme.Candy:
+            {
+                // Sweet pastels: pink → lavender → mint → baby blue → lemon (low saturation, bright).
+                float p = hue;
+                saturation = 0.55f;
+                brightness = 1f;
+                if (p < 0.20f)      hue = 0.92f; // pink
+                else if (p < 0.40f) hue = 0.75f; // lavender
+                else if (p < 0.60f) hue = 0.45f; // mint
+                else if (p < 0.80f) hue = 0.55f; // baby blue
+                else                hue = 0.14f; // lemon
+                break;
+            }
+
+            case RGBTheme.Police:
+            {
+                // Flashing red / blue.
+                float p = hue;
+                saturation = 1f;
+                brightness = 1f;
+                hue = p < 0.5f ? 0.00f : 0.62f;
+                break;
+            }
+
+            case RGBTheme.Fire:
+            {
+                // Flames: hot bright yellow at the crest, cooling to dark red at the edges.
+                float p = hue;
+                float t = Mathf.Abs(p * 2f - 1f);     // 0 at crest, 1 at edges
+                saturation = 1f;
+                hue = Mathf.Lerp(0.13f, 0f, t);       // yellow -> red
+                brightness = Mathf.Lerp(1f, 0.35f, t);
+                break;
+            }
+
+            case RGBTheme.Ice:
+            {
+                // Frost: near-white to icy blue, always bright.
+                float p = hue;
+                float t = Mathf.Abs(p * 2f - 1f);
+                hue = 0.55f;
+                saturation = Mathf.Lerp(0.12f, 0.5f, t);
+                brightness = 1f;
+                break;
+            }
+
+            case RGBTheme.Toxic:
+            {
+                // Radioactive: acid green pulsing toward black.
+                float p = hue;
+                hue = 0.27f;
+                saturation = 1f;
+                brightness = Mathf.Lerp(0.1f, 1f, Mathf.Abs(p * 2f - 1f));
+                break;
+            }
+
+            case RGBTheme.Rave:
+            {
+                // Strobe: 10 vivid full-spectrum steps, hard jumps.
+                float p = hue;
+                hue = Mathf.Floor(p * 10f) / 10f;
+                saturation = 1f;
+                brightness = 1f;
+                break;
+            }
 
             case RGBTheme.Classic:
             default:
@@ -586,6 +722,7 @@ public static class ChromaHeaders
 
     private static void OnComponentChanged()
     {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return; // mirror OnObjectChanges / ChromaLinter
         ClearComponentCache();
         EditorApplication.RepaintHierarchyWindow();
     }
@@ -730,7 +867,7 @@ public static class ChromaHeaders
         _headerStyle.alignment = info.m_alignment;
         _headerStyle.fontStyle = info.m_fontStyle;
         _headerStyle.fontSize = info.m_fontSize; // 0 = default size
-        _headerStyle.font = ResolveBannerFont(Config); // null = editor default
+        _headerStyle.font = CachedBannerFont(Config); // null = editor default
 
         Rect labelRect = fullRect;
         if (info.m_alignment == TextAnchor.MiddleLeft) { labelRect.x += 4f; labelRect.width -= 4f; }
@@ -748,6 +885,22 @@ public static class ChromaHeaders
         if (cfg == null) return null;
         if (cfg.m_bannerFont != null) return cfg.m_bannerFont;
         return ResolveOSFont(cfg.m_bannerFontName);
+    }
+
+    /// <summary>
+    /// Cached banner font for the per-row draw path. The resolved font only changes on a config edit
+    /// (invalidated in OnConfigChanged); we still re-resolve if a previously cached dynamic font was
+    /// unloaded by the editor (cached value went null while the config still asks for a font).
+    /// </summary>
+    private static Font CachedBannerFont(ChromaConfig cfg)
+    {
+        bool wantsFont = cfg != null && (cfg.m_bannerFont != null || !string.IsNullOrEmpty(cfg.m_bannerFontName));
+        if (!_bannerFontCached || (_bannerFont == null && wantsFont))
+        {
+            _bannerFont = ResolveBannerFont(cfg);
+            _bannerFontCached = true;
+        }
+        return _bannerFont;
     }
 
     /// <summary>Get (or create + cache) a dynamic font for an installed system font name. Empty = null.</summary>
@@ -1060,7 +1213,7 @@ public static class ChromaHeaders
             ? (cfg.m_separatorItalic ? FontStyle.BoldAndItalic : FontStyle.Bold)
             : (cfg.m_separatorItalic ? FontStyle.Italic : FontStyle.Normal);
         _sepStyle.normal.textColor = line;
-        _sepStyle.font = ResolveBannerFont(cfg); // null = editor default
+        _sepStyle.font = CachedBannerFont(cfg); // null = editor default
         _sepContent.text = cfg.m_separatorUppercase ? info.m_separatorCaption.ToUpperInvariant() : info.m_separatorCaption;
         Vector2 size = _sepStyle.CalcSize(_sepContent);
         float center = (left + right) * 0.5f;
@@ -1303,6 +1456,9 @@ public static class ChromaHeaders
     private static readonly Dictionary<int, bool> _missingScriptCache = new Dictionary<int, bool>();
     private static readonly Dictionary<int, Texture[]> _iconCache = new Dictionary<int, Texture[]>();
     private static readonly Dictionary<string, Font> _osFontCache = new Dictionary<string, Font>();
+    private static readonly HashSet<int> _selectedIds = new HashSet<int>();
+    private static Font _bannerFont;        // resolved banner font, cached across rows/repaints
+    private static bool _bannerFontCached;  // invalidated in OnConfigChanged
     private static Dictionary<string, string> _presetCache;
     private static ChromaConfig _configCache;
 

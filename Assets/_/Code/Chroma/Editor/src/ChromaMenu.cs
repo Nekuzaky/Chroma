@@ -76,6 +76,47 @@ public static class ChromaMenu
             ChromaLinter.ToggleIgnore(sel[i]);
     }
 
+    [MenuItem("GameObject/Chroma/Set Scene Icon (banner color)", true)]
+    private static bool ValidateSetIcon() => Selection.activeGameObject != null;
+
+    // Persists Unity's nearest built-in colored label icon on the object (Scene + Hierarchy gizmo).
+    // NOTE: this WRITES to the object (m_Icon) — it shows up in version control. Explicit/manual only.
+    [MenuItem("GameObject/Chroma/Set Scene Icon (banner color)", false, 221)]
+    private static void MenuSetIcon()
+    {
+        GameObject[] sel = Selection.gameObjects;
+        if (sel == null) return;
+        int set = 0;
+        for (int i = 0; i < sel.Length; i++)
+        {
+            GameObject go = sel[i];
+            if (go == null || !ChromaHeaders.TryGetRowColor(go, out Color c)) continue;
+            Texture2D icon = LabelIcon(NearestLabelIndex(c));
+            if (icon == null) continue;
+            EditorGUIUtility.SetIconForObject(go, icon);
+            EditorUtility.SetDirty(go);
+            set++;
+        }
+        if (set > 0) EditorApplication.RepaintHierarchyWindow();
+    }
+
+    [MenuItem("GameObject/Chroma/Clear Scene Icon", true)]
+    private static bool ValidateClearIcon() => Selection.activeGameObject != null;
+
+    [MenuItem("GameObject/Chroma/Clear Scene Icon", false, 222)]
+    private static void MenuClearIcon()
+    {
+        GameObject[] sel = Selection.gameObjects;
+        if (sel == null) return;
+        for (int i = 0; i < sel.Length; i++)
+        {
+            if (sel[i] == null) continue;
+            EditorGUIUtility.SetIconForObject(sel[i], null);
+            EditorUtility.SetDirty(sel[i]);
+        }
+        EditorApplication.RepaintHierarchyWindow();
+    }
+
     [MenuItem("GameObject/Chroma/Open Window", false, 230)]
     private static void MenuOpenWindow() => OpenWindow();
 
@@ -149,6 +190,29 @@ public static class ChromaMenu
     }
 
     private static void OpenWindow() => EditorWindow.GetWindow<ChromaWindow>("Chroma");
+
+    // Built-in colored label icon ("sv_label_0".."sv_label_7"), or null on older/newer editors.
+    private static Texture2D LabelIcon(int index)
+    {
+        GUIContent c = EditorGUIUtility.IconContent("sv_label_" + Mathf.Clamp(index, 0, 7));
+        return c != null ? c.image as Texture2D : null;
+    }
+
+    // Nearest of Unity's 8 built-in label colors to a color, matched by hue.
+    private static int NearestLabelIndex(Color color)
+    {
+        Color.RGBToHSV(color, out float h, out float s, out _);
+        if (s < 0.12f) return 0; // near-gray: default to the blue label
+        float[] targets = { 0.60f, 0.50f, 0.33f, 0.16f, 0.08f, 0.00f, 0.88f, 0.76f };
+        int best = 0;
+        float bestDist = 2f;
+        for (int i = 0; i < targets.Length; i++)
+        {
+            float d = Mathf.Abs(Mathf.DeltaAngle(h * 360f, targets[i] * 360f)) / 360f;
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
 
     private static System.Collections.Generic.List<string> GetSelectedFolderGuids()
     {

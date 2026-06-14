@@ -14,6 +14,8 @@ public static class ChromaFolders
 
     private static ChromaConfig _configCache;
     private static readonly Dictionary<string, Color> _colors = new Dictionary<string, Color>();
+    // Memoized inherited colors (incl. Color.clear "no parent"); invalidated wherever _colors is.
+    private static readonly Dictionary<string, Color> _resolved = new Dictionary<string, Color>();
     private static readonly Dictionary<string, Texture> _folderIcon = new Dictionary<string, Texture>();
     private static int _cachedVersion = -1;
     private static bool _dirty = true;
@@ -26,7 +28,7 @@ public static class ChromaFolders
     static ChromaFolders()
     {
         EditorApplication.projectWindowItemOnGUI += OnProjectItemGUI;
-        EditorApplication.projectChanged += () => { _dirty = true; _folderIcon.Clear(); };
+        EditorApplication.projectChanged += () => { _dirty = true; _folderIcon.Clear(); _resolved.Clear(); };
     }
 
     private static void OnProjectItemGUI(string guid, Rect rect)
@@ -98,8 +100,20 @@ public static class ChromaFolders
 
     #region Folder Inheritance
 
-    /// <summary>Try to find and apply parent folder's color. Returns Color.clear if no parent color found.</summary>
+    /// <summary>
+    /// Try to find and apply a parent folder's color. Returns Color.clear if none. Memoized per GUID
+    /// (the result is a pure function of the GUID + the _colors map), so a deep tree resolves its
+    /// ~4*depth AssetDatabase round-trips only once until folder colors / the project change.
+    /// </summary>
     private static Color TryGetParentColor(string childGuid, ChromaConfig cfg)
+    {
+        if (_resolved.TryGetValue(childGuid, out Color cached)) return cached;
+        Color result = ResolveParentColor(childGuid, cfg);
+        _resolved[childGuid] = result;
+        return result;
+    }
+
+    private static Color ResolveParentColor(string childGuid, ChromaConfig cfg)
     {
         string childPath = AssetDatabase.GUIDToAssetPath(childGuid);
         if (string.IsNullOrEmpty(childPath) || !AssetDatabase.IsValidFolder(childPath))
@@ -195,6 +209,7 @@ public static class ChromaFolders
         if (!_dirty && _cachedVersion == cfg.m_version) return;
 
         _colors.Clear();
+        _resolved.Clear(); // inherited-color memo depends on _colors
         if (cfg.m_folderColors != null)
             foreach (ChromaConfig.FolderColor f in cfg.m_folderColors)
                 if (f != null && !string.IsNullOrEmpty(f.m_guid))

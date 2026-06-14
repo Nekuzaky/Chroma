@@ -7,7 +7,8 @@ namespace Chroma.Editor
 public enum ChildInheritMode { Flat, DepthFade }
 public enum AutoColorMatch { Tag, Layer, NamePrefix, Regex }
 public enum SeparatorStyle { Solid, Dashed, Dotted, Double }
-public enum RGBTheme { Classic, Halloween, Christmas, Valentine }
+// NOTE: append new values at the END only — RGBTheme is serialized by index.
+public enum RGBTheme { Classic, Halloween, Christmas, Valentine, Matrix, Corrupted, Funny, FastFood, Candy, Police, Fire, Ice, Toxic, Rave }
 
 /// <summary>Severity of a lint rule violation. Order matters: higher = worse.</summary>
 public enum LintSeverity { Info, Warning, Error }
@@ -101,6 +102,9 @@ public class ChromaConfig : ScriptableObject
         [System.NonSerialized] internal string m_cachedAssertRegexFor;
         [System.NonSerialized] internal int m_cachedInt;
         [System.NonSerialized] internal string m_cachedIntFor;
+        // Resolved display strings, cached per scan (invariant per rule); cleared on config change.
+        [System.NonSerialized] internal string m_cachedRuleId;
+        [System.NonSerialized] internal string m_cachedMessage;
     }
 
     #region Public
@@ -270,8 +274,9 @@ public class ChromaConfig : ScriptableObject
         m_schemaVersion = CURRENT_SCHEMA;
     }
 
-    // FUTURE MIGRATIONS:
-    // if (m_schemaVersion < 4) MigrateV3ToV4();
+    // FUTURE MIGRATIONS — add as conditionals BEFORE the unconditional
+    // "m_schemaVersion = CURRENT_SCHEMA;" above, and bump CURRENT_SCHEMA:
+    // if (m_schemaVersion < 5) MigrateV4ToV5();
     // ... and so on
 
     #endregion
