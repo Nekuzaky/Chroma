@@ -78,6 +78,9 @@ Scopes: every object, roots only, by Tag, Layer, name prefix, or regex.
 - **Active toggle** — always-visible checkbox on every row; click toggles `SetActive` with full Undo
 - **Component icons** — see each object's components at a glance (cached, capped, configurable)
 
+### Selection Accent
+The selected row is washed with the theme accent — and it stays visible even on banner rows, which otherwise hide Unity's native blue highlight. Themes reseed the accent from their primary color.
+
 ### Separators
 Create visual dividers by naming objects `---` or `___`:
 - Solid, Dashed, Dotted, or Double line styles
@@ -107,11 +110,18 @@ Children inherit parent banner colors:
 ### Project Window Colors
 Color folders in the Project window, with optional inheritance to child folders.
 
+### Scene View Color-Coding
+Extend banner colors into the viewport (opt-in, editor-only):
+- **Floating labels** — a colored name tag above each banner-colored object
+- **Wireframe markers** — a colored box around each banner-colored object
+- **"Chroma Bookmarks" overlay** — colored chips for your bookmarks; click to select + frame (enable it from the Scene View overlays menu)
+- **Colored object icon** — `GameObject ▸ Chroma ▸ Set Scene Icon` assigns Unity's nearest built-in colored label icon from the banner color
+
 ### RGB Mode
-Animate Hierarchy rows and Project-window folders through rainbow colors (~30fps), with Halloween / Christmas / Valentine themes.
+Animate Hierarchy rows and Project-window folders through rainbow colors (~30fps). **14 themes**: Classic, Halloween, Christmas, Valentine, Matrix, Corrupted, Funny, Fast Food, Candy, Police, Fire, Ice, Toxic, Rave.
 
 ### Themes & Presets
-Quick color schemes — Minimal, Vibrant, Soft, High-Contrast, plus two **colorblind-safe palettes** (Okabe-Ito and IBM, deuteranopia/protanopia friendly) — and reusable banner presets.
+**16 color schemes**, each with a live palette preview: Minimal, Vibrant, Soft, High-Contrast, **Okabe-Ito & IBM** (colorblind-safe), plus Synthwave, Neon Noir, Ocean, Autumn, Ember, Solar, Teal Mono, Violet Mono, Warm Gray, Jewel Box. Applying a theme also reseeds the zebra and selection-accent colors. Reusable banner presets too. The window's own chrome is animated with Chroma's signature rainbow.
 
 ### Custom Banner Font
 Use a Font asset or any installed system font (Sans / Serif / Mono / Comic).
@@ -150,7 +160,7 @@ Configure:
 4. Bind **Chroma/Next Lint Violation** in Edit ▸ Shortcuts to cycle through issues
 
 ### Quick Actions
-- Right-click a GameObject ▸ **Chroma** — bookmark, copy/paste style, strip, lint-ignore
+- Right-click a GameObject ▸ **Chroma** — bookmark, copy/paste style, strip, lint-ignore, set/clear scene icon
 - Right-click a folder ▸ **Chroma ▸ Folder Color** — color the folder in the Project window
 
 ## Installation
