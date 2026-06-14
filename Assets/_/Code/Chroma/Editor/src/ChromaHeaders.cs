@@ -56,13 +56,21 @@ public static class ChromaHeaders
 #if UNITY_EDITOR
         ChromaBanner.Changed += OnComponentChanged;
 #endif
+        // Component add/remove doesn't always fire hierarchyChanged; this keeps the
+        // component-icon and missing-script caches honest. Skipped in play mode (fires per frame).
+        ObjectChangeEvents.changesPublished -= OnObjectChanges;
+        ObjectChangeEvents.changesPublished += OnObjectChanges;
+
         EditorApplication.delayCall += () => EnsureRgbPump(Config);
     }
 
     /// <summary>Renders colored banners, separators, tree lines, and tints for a single hierarchy row.</summary>
     private static void OnHierarchyGUI(int instanceID, Rect selectionRect)
     {
-        if (Event.current.type != EventType.Repaint) return;
+        Event evt = Event.current;
+        bool isRepaint = evt.type == EventType.Repaint;
+        // MouseDown is needed for the interactive row widgets (active toggle).
+        if (!isRepaint && evt.type != EventType.MouseDown) return;
 
         // InstanceIDToObject is obsolete in Unity 6000.2+ (use EntityIdToObject), but it exists on
         // every Unity version while EntityIdToObject doesn't — keep it for portability, mute the warning.
@@ -72,10 +80,17 @@ public static class ChromaHeaders
         if (obj == null) return;
 
         ChromaConfig cfg = Config;
-        EnsureStyles();
 
         // GameObject.name allocates a string per access; fetch it once and reuse.
         string goName = obj.name;
+
+        if (!isRepaint)
+        {
+            HandleRowMouse(evt, obj, goName, cfg, selectionRect);
+            return;
+        }
+
+        EnsureStyles();
 
         // A ChromaBanner component takes precedence over name-based banners and keeps the name clean.
         // compInfo is pre-assigned so the short-circuited && (when headers are disabled) can't leave
@@ -116,13 +131,25 @@ public static class ChromaHeaders
                 DrawRowTint(obj, cfg, selectionRect, goName);
         }
 
+        // Selection accent: wash the theme color over the selected row. Drawn after the banner/
+        // tint (so it stays visible on banner rows, which otherwise hide the native blue highlight)
+        // but before the right-side icons (so it doesn't tint them). Blends over, never covers.
+        if (cfg.m_selectionAccent && cfg.m_selectionAccentColor.a > 0.001f && Selection.Contains(instanceID))
+            EditorGUI.DrawRect(new Rect(selectionRect.x, selectionRect.y, selectionRect.width + RowExtra, selectionRect.height), cfg.m_selectionAccentColor);
+
         // Right-side indicators, drawn last so a banner / separator / tint never hides them.
-        // Slots fill from the far right: bookmark star, then the missing-script warning to its left;
-        // the child count is right-padded to clear whatever icons are present.
+        // Slots fill from the far right: active toggle, bookmark star, missing-script warning,
+        // lint severity, then component icons; the child count clears whatever is present.
+        bool sepRow = !hasComp && cfg.m_enableSeparators && info.m_isSeparator;
         int rightIcons = 0;
+        if (cfg.m_showActiveToggle && !sepRow)
+        {
+            DrawActiveToggle(obj, selectionRect, rightIcons);
+            rightIcons++;
+        }
         if (bookmarked)
         {
-            DrawBookmark(selectionRect);
+            DrawBookmark(selectionRect, rightIcons);
             rightIcons++;
         }
         if (cfg.m_warnMissingScripts && HasMissingScripts(instanceID, obj))
@@ -130,8 +157,31 @@ public static class ChromaHeaders
             DrawMissingWarning(selectionRect, rightIcons);
             rightIcons++;
         }
-        if (cfg.m_showChildCount && !info.m_isSeparator)
+        if (cfg.m_enableLint && cfg.m_lintShowIcons && !sepRow
+            && ChromaLinter.TryGetWorst(instanceID, out ChromaLinter.Violation worst))
+        {
+            DrawLintIcon(worst, selectionRect, rightIcons);
+            rightIcons++;
+        }
+        if (cfg.m_showComponentIcons && !sepRow)
+            rightIcons += DrawComponentIcons(instanceID, obj, selectionRect, rightIcons, cfg);
+        if (cfg.m_showChildCount && !sepRow)
             DrawChildCount(obj, selectionRect, 2f + rightIcons * 16f);
+    }
+
+    /// <summary>Hit-test and run the interactive row widgets (active toggle) on MouseDown.</summary>
+    private static void HandleRowMouse(Event evt, GameObject obj, string goName, ChromaConfig cfg, Rect selectionRect)
+    {
+        if (!cfg.m_showActiveToggle || evt.button != 0) return;
+        if (!RightSlot(selectionRect, 0).Contains(evt.mousePosition)) return;
+
+        // No toggle is drawn on separator rows, so don't react there either.
+        if (cfg.m_enableSeparators && GetHeaderInfo(goName).m_isSeparator) return;
+
+        Undo.RecordObject(obj, obj.activeSelf ? "Chroma: deactivate object" : "Chroma: activate object");
+        obj.SetActive(!obj.activeSelf);
+        EditorUtility.SetDirty(obj);
+        evt.Use();
     }
 
     #endregion
@@ -146,8 +196,10 @@ public static class ChromaHeaders
         _configCache = cfg;
         _presetCache = null;
         ClearHeaderCache();
+        ClearComponentCache(); // icon count / widget options may have changed
         InvalidateAutoColorCache(cfg);
         EnsureRgbPump(cfg);
+        ChromaLinter.OnConfigChanged(cfg);
         EditorApplication.RepaintHierarchyWindow();
     }
 
@@ -482,6 +534,43 @@ public static class ChromaHeaders
         }
     }
 
+    // Used by ChromaLinter's HasBanner assertion. Bypasses the render cache on purpose:
+    // lint scans over thousands of names must not evict the hot rows' parsed specs.
+    internal static bool NameIsHeader(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        HeaderInfo info = ParseHeader(name);
+        bool isHeader = info.m_isHeader;
+        if (info.m_gradientTex != null)
+            UnityEngine.Object.DestroyImmediate(info.m_gradientTex);
+        return isHeader;
+    }
+
+    /// <summary>
+    /// Resolve the banner color of a GameObject (ChromaBanner component first, then a name-based
+    /// banner spec, resolving presets). Used by the Scene View overlay. False when the object has
+    /// no Chroma banner color.
+    /// </summary>
+    internal static bool TryGetRowColor(GameObject go, out Color color)
+    {
+        color = default;
+        if (go == null) return false;
+
+        ChromaBanner b = go.GetComponent<ChromaBanner>();
+        if (b != null && b.enabled && b.m_background)
+        {
+            color = b.m_color;
+            return true;
+        }
+
+        string name = go.name;
+        int eq = name.IndexOf('=');
+        if (eq > 0 && TryGetPreviewColor(name.Substring(0, eq), out color))
+            return true;
+
+        return false;
+    }
+
     #endregion
 
 
@@ -501,6 +590,12 @@ public static class ChromaHeaders
         EditorApplication.RepaintHierarchyWindow();
     }
 
+    private static void OnObjectChanges(ref ObjectChangeEventStream stream)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+        ClearComponentCache();
+    }
+
     private static void ClearComponentCache()
     {
         foreach (var kv in _compCache)
@@ -508,6 +603,7 @@ public static class ChromaHeaders
                 UnityEngine.Object.DestroyImmediate(kv.Value.m_gradientTex);
         _compCache.Clear();
         _missingScriptCache.Clear();
+        _iconCache.Clear();
     }
 
     // Cached per-object lookup of the ChromaBanner component. The cache stores a sentinel
@@ -603,11 +699,18 @@ public static class ChromaHeaders
         _headerStyle = new GUIStyle(EditorStyles.boldLabel);
         _sepStyle = new GUIStyle(EditorStyles.boldLabel) { alignment = TextAnchor.MiddleCenter, fontSize = 10 };
         _countStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight, fontSize = 9 };
-        _countStyle.normal.textColor = new Color(1f, 1f, 1f, 0.4f); // set once, not per row
+        // Skin-aware: white-on-dark was invisible on the light skin. Set once, not per row.
+        _countStyle.normal.textColor = EditorGUIUtility.isProSkin
+            ? new Color(1f, 1f, 1f, 0.4f)
+            : new Color(0f, 0f, 0f, 0.45f);
         _sepContent = new GUIContent();
         _starContent = EditorGUIUtility.IconContent("Favorite Icon");
         _warnContent = EditorGUIUtility.IconContent("console.warnicon.sml");
         if (_warnContent != null) _warnContent.tooltip = "Missing script(s) on this GameObject";
+        _lintInfoContent = EditorGUIUtility.IconContent("console.infoicon.sml");
+        _lintWarnContent = EditorGUIUtility.IconContent("console.warnicon.sml");
+        _lintErrorContent = EditorGUIUtility.IconContent("console.erroricon.sml");
+        _iconTip = new GUIContent();
         // Approximate Hierarchy row background, used to mask the native name on text-only ("nobg") banners.
         _rowMaskColor = EditorGUIUtility.isProSkin ? new Color(0.219f, 0.219f, 0.219f) : new Color(0.784f, 0.784f, 0.784f);
         _stylesReady = true;
@@ -834,13 +937,87 @@ public static class ChromaHeaders
         return has;
     }
 
+    // Geometry of the far-right icon column: slot 0 hugs the right edge, slots grow leftwards.
+    private static Rect RightSlot(Rect rect, int slot)
+    {
+        return new Rect(rect.xMax - 16f - slot * 16f, rect.y + (rect.height - 14f) * 0.5f, 14f, 14f);
+    }
+
+    // Always-visible activation checkbox. The click is handled in HandleRowMouse (MouseDown);
+    // this only paints the current state.
+    private static void DrawActiveToggle(GameObject obj, Rect rect, int slot)
+    {
+        EditorStyles.toggle.Draw(RightSlot(rect, slot), GUIContent.none, false, false, obj.activeSelf, false);
+    }
+
+    // Lint severity icon with the rule message as tooltip.
+    private static void DrawLintIcon(ChromaLinter.Violation v, Rect rect, int slot)
+    {
+        GUIContent src = v.m_severity == LintSeverity.Error ? _lintErrorContent
+            : v.m_severity == LintSeverity.Warning ? _lintWarnContent
+            : _lintInfoContent;
+
+        Rect r = RightSlot(rect, slot);
+        if (src == null || src.image == null)
+        {
+            EditorGUI.DrawRect(r, v.m_severity == LintSeverity.Error
+                ? new Color(0.90f, 0.25f, 0.25f, 0.9f)
+                : new Color(0.95f, 0.65f, 0.10f, 0.9f)); // fallback marker
+            return;
+        }
+
+        _iconTip.image = src.image;
+        _iconTip.tooltip = v.m_message;
+        GUI.Label(r, _iconTip, GUIStyle.none);
+        _iconTip.image = null;
+    }
+
+    // Component icon strip (cached per instanceID). Returns how many slots were consumed.
+    private static int DrawComponentIcons(int instanceID, GameObject obj, Rect rect, int slot, ChromaConfig cfg)
+    {
+        Texture[] icons = GetComponentIcons(instanceID, obj, cfg);
+        int drawn = 0;
+        for (int i = 0; i < icons.Length; i++)
+        {
+            Rect r = RightSlot(rect, slot + drawn);
+            if (r.x < rect.x + 70f) break; // keep clear of the object name on narrow windows
+            GUI.DrawTexture(r, icons[i], ScaleMode.ScaleToFit);
+            drawn++;
+        }
+        return drawn;
+    }
+
+    // Cached per-object component icons. GetComponents runs only on a cache miss; the cache is
+    // cleared on hierarchyChanged / object changes / assembly reload (see ClearComponentCache).
+    private static Texture[] GetComponentIcons(int instanceID, GameObject obj, ChromaConfig cfg)
+    {
+        if (_iconCache.TryGetValue(instanceID, out Texture[] cached)) return cached;
+
+        int max = Mathf.Clamp(cfg.m_maxComponentIcons, 1, 8);
+        Component[] comps = obj.GetComponents<Component>();
+        List<Texture> list = null;
+        for (int i = 0; i < comps.Length; i++)
+        {
+            Component c = comps[i];
+            if (c == null || c is Transform || c is ChromaBanner) continue; // missing scripts have their own icon
+            Texture tex = AssetPreview.GetMiniThumbnail(c);
+            if (tex == null) continue;
+            if (list == null) list = new List<Texture>(max);
+            list.Add(tex);
+            if (list.Count >= max) break;
+        }
+
+        Texture[] arr = list != null ? list.ToArray() : System.Array.Empty<Texture>();
+        _iconCache[instanceID] = arr;
+        return arr;
+    }
+
     // Warning icon for missing scripts. slotFromRight = how many icons already occupy the far edge.
     private static void DrawMissingWarning(Rect rect, int slotFromRight)
     {
-        float x = rect.xMax - 16f - slotFromRight * 16f;
-        Rect r = new Rect(x, rect.y + (rect.height - 14f) * 0.5f, 14f, 14f);
+        Rect r = RightSlot(rect, slotFromRight);
         if (_warnContent != null && _warnContent.image != null)
-            GUI.DrawTexture(r, _warnContent.image, ScaleMode.ScaleToFit);
+            GUI.Label(r, _warnContent, GUIStyle.none); // Label (not DrawTexture) so the tooltip works
         else
             EditorGUI.DrawRect(r, new Color(0.95f, 0.4f, 0.1f, 0.9f)); // fallback marker
     }
@@ -853,9 +1030,9 @@ public static class ChromaHeaders
         return "(" + n + ")"; // very large counts: rare, accept the alloc
     }
 
-    private static void DrawBookmark(Rect rect)
+    private static void DrawBookmark(Rect rect, int slot)
     {
-        Rect starRect = new Rect(rect.xMax - 16f, rect.y + (rect.height - 14f) * 0.5f, 14f, 14f);
+        Rect starRect = RightSlot(rect, slot);
         if (_starContent != null && _starContent.image != null)
             GUI.DrawTexture(starRect, _starContent.image, ScaleMode.ScaleToFit);
         else
@@ -1124,6 +1301,7 @@ public static class ChromaHeaders
     private static readonly Dictionary<string, HeaderInfo> _headerCache = new Dictionary<string, HeaderInfo>();
     private static readonly Dictionary<int, HeaderInfo> _compCache = new Dictionary<int, HeaderInfo>();
     private static readonly Dictionary<int, bool> _missingScriptCache = new Dictionary<int, bool>();
+    private static readonly Dictionary<int, Texture[]> _iconCache = new Dictionary<int, Texture[]>();
     private static readonly Dictionary<string, Font> _osFontCache = new Dictionary<string, Font>();
     private static Dictionary<string, string> _presetCache;
     private static ChromaConfig _configCache;
@@ -1134,6 +1312,10 @@ public static class ChromaHeaders
     private static GUIContent _sepContent;
     private static GUIContent _starContent;
     private static GUIContent _warnContent;
+    private static GUIContent _lintInfoContent;
+    private static GUIContent _lintWarnContent;
+    private static GUIContent _lintErrorContent;
+    private static GUIContent _iconTip; // shared, mutated per row (image + tooltip)
     private static Color _rowMaskColor;
     private static bool _stylesReady;
     private static readonly string[] _countLabels = new string[64]; // cached "(N)" child-count labels

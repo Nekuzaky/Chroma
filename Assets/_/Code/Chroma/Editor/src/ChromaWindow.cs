@@ -16,7 +16,7 @@ namespace Chroma.Editor
 /// </summary>
 public class ChromaWindow : EditorWindow
 {
-    private enum Tab { Selection, Settings }
+    private enum Tab { Selection, Settings, Lint }
     private enum OutputMode { Name, Component }
     private enum SelSource { None, NameBanner, Component }
 
@@ -29,6 +29,91 @@ public class ChromaWindow : EditorWindow
         ChromaHeaders.OnConfigChanged(_config);
         wantsMouseMove = true; // live hover highlight on section headers
         _tab = (Tab)EditorPrefs.GetInt("Chroma.Tab", 0);
+
+        ChromaLinter.Changed -= HandleLintChanged;
+        ChromaLinter.Changed += HandleLintChanged;
+
+        // Drive the animated chromatic header while the window is open.
+        EditorApplication.update -= AnimateChrome;
+        EditorApplication.update += AnimateChrome;
+    }
+
+    private void OnDisable()
+    {
+        ChromaLinter.Changed -= HandleLintChanged;
+        EditorApplication.update -= AnimateChrome;
+    }
+
+    /// <summary>
+    /// Animates the header chrome: the logo chip cycles through bright hues, the header background
+    /// drifts through a subtle dark tint, and the rainbow divider scrolls — Chroma's RGB signature.
+    /// Throttled to ~25fps and only runs while the window is open (unsubscribed in OnDisable).
+    /// </summary>
+    private void AnimateChrome()
+    {
+        double now = EditorApplication.timeSinceStartup;
+        float baseHue = Mathf.Repeat((float)now * 0.05f, 1f);
+
+        // Fast lane (~25fps): header chrome only — cheap, no IMGUI bodies re-run here.
+        if (now - _lastAnim >= 0.04)
+        {
+            _lastAnim = now;
+            if (_header != null) _header.style.backgroundColor = Color.HSVToRGB(baseHue, 0.20f, 0.14f);
+            _rainbow?.MarkDirtyRepaint();
+        }
+
+        // Slow lane (~10fps): section-card accents (spread across the spectrum) + active tab tint.
+        // Throttled because repainting a card can re-run its IMGUI body.
+        if (now - _lastAccent >= 0.1)
+        {
+            _lastAccent = now;
+            for (int i = 0; i < _accentCards.Count; i++)
+            {
+                if (_accentCards[i] == null) continue;
+                float h = Mathf.Repeat(baseHue + i * 0.055f, 1f);
+                _accentCards[i].style.borderLeftColor = Color.HSVToRGB(h, 0.7f, 0.92f);
+            }
+
+            if (_tabButtons != null)
+                for (int i = 0; i < _tabButtons.Length; i++)
+                {
+                    if (_tabButtons[i] == null) continue;
+                    if ((int)_tab == i) _tabButtons[i].style.backgroundColor = Color.HSVToRGB(baseHue, 0.5f, 0.55f);
+                    else _tabButtons[i].style.backgroundColor = StyleKeyword.Null; // fall back to USS
+                }
+        }
+    }
+
+    /// <summary>Paint the full-width animated rainbow divider under the header.</summary>
+    private void PaintRainbow()
+    {
+        if (_rainbow == null) return;
+        Rect r = _rainbow.contentRect;
+        if (r.width < 1f || r.height < 1f) return;
+
+        float time = (float)EditorApplication.timeSinceStartup;
+        int slices = Mathf.Max(16, Mathf.CeilToInt(r.width / 5f));
+        float sw = r.width / slices;
+        for (int i = 0; i < slices; i++)
+        {
+            float hue = Mathf.Repeat(time * 0.05f + i / (float)slices, 1f);
+            EditorGUI.DrawRect(new Rect(i * sw, 0f, sw + 1f, r.height), Color.HSVToRGB(hue, 0.7f, 1f));
+        }
+    }
+
+    /// <summary>Linter finished a scan: refresh the tab badge and the Lint tab bodies.</summary>
+    private void HandleLintChanged()
+    {
+        UpdateLintTabLabel();
+        RepaintSettings();
+    }
+
+    /// <summary>Show the violation count in the Lint tab label ("Lint (3)").</summary>
+    private void UpdateLintTabLabel()
+    {
+        if (_tabButtons == null || _tabButtons.Length < 3 || _tabButtons[2] == null) return;
+        int total = ChromaLinter.Total;
+        _tabButtons[2].text = total > 0 ? "Lint (" + total + ")" : "Lint";
     }
 
     private void OnSelectionChange()
@@ -43,11 +128,42 @@ public class ChromaWindow : EditorWindow
     }
 
     /// <summary>
+    /// UI Toolkit entry point. Wraps the real build in a try/catch because UI Toolkit can swallow
+    /// exceptions thrown during CreateGUI, leaving the window blank with nothing in the Console.
+    /// </summary>
+    private void CreateGUI()
+    {
+        try
+        {
+            BuildUI();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[Chroma] Window build failed — please report this stack trace:\n" + e);
+            BuildFallbackUI(e);
+        }
+    }
+
+    /// <summary>Minimal UI shown when BuildUI throws, so the window still opens and shows the cause.</summary>
+    private void BuildFallbackUI(Exception e)
+    {
+        VisualElement root = rootVisualElement;
+        root.Clear();
+        var label = new Label("Chroma failed to build its UI:\n\n" + e.Message
+            + "\n\nSee the Console for the full stack trace.");
+        label.style.whiteSpace = WhiteSpace.Normal;
+        label.style.paddingLeft = 12;
+        label.style.paddingRight = 12;
+        label.style.paddingTop = 12;
+        root.Add(label);
+    }
+
+    /// <summary>
     /// Builds the modern UI Toolkit chrome (header, animated tab bar) and hosts the existing
     /// IMGUI panels inside an IMGUIContainer. UI Toolkit (USS) gives rounded corners, hover
     /// transitions and consistent theming that IMGUI can't.
     /// </summary>
-    private void CreateGUI()
+    private void BuildUI()
     {
         if (_config == null) OnEnable();
 
@@ -60,6 +176,7 @@ public class ChromaWindow : EditorWindow
         // --- Header (logo + title + search) ---
         var header = new VisualElement();
         header.AddToClassList("chroma-header");
+        _header = header;
         var titleRow = new VisualElement();
         titleRow.AddToClassList("chroma-titlerow");
         var titles = new VisualElement();
@@ -84,30 +201,47 @@ public class ChromaWindow : EditorWindow
         header.Add(search);
         root.Add(header);
 
+        // Animated rainbow divider (full-bleed) — Chroma's signature, right under the header.
+        _rainbow = new IMGUIContainer(PaintRainbow);
+        _rainbow.AddToClassList("chroma-rainbow");
+        _rainbow.pickingMode = PickingMode.Ignore;
+        root.Add(_rainbow);
+
         // --- Tab bar ---
         var tabbar = new VisualElement();
         tabbar.AddToClassList("chroma-tabbar");
-        _tabButtons = new[] { MakeTab("Selection", Tab.Selection), MakeTab("Settings", Tab.Settings) };
+        _tabButtons = new[]
+        {
+            MakeTab("Selection", Tab.Selection),
+            MakeTab("Settings", Tab.Settings),
+            MakeTab("Lint", Tab.Lint)
+        };
         tabbar.Add(_tabButtons[0]);
         tabbar.Add(_tabButtons[1]);
+        tabbar.Add(_tabButtons[2]);
         root.Add(tabbar);
         RefreshTabClasses();
 
-        // --- Content: Selection (native UIElements) + Settings (IMGUI), toggled by tab ---
-        _selectionRoot = BuildSelectionUI();
+        // --- Content: Selection (native UIElements) + Settings / Lint (IMGUI), toggled by tab ---
+        _settingsBodies = new List<IMGUIContainer>(); // shared by the Settings and Lint builders
+        _accentCards.Clear();                         // rebuilt as foldouts are created
 
+        _selectionRoot = BuildSelectionUI();
         _settingsRoot = BuildSettingsUI();
+        _lintRoot = BuildLintUI();
 
         var scroll = new ScrollView(ScrollViewMode.Vertical);
         scroll.style.flexGrow = 1f;
         scroll.Add(_selectionRoot);
         scroll.Add(_settingsRoot);
+        scroll.Add(_lintRoot);
         root.Add(scroll);
 
+        UpdateLintTabLabel();
         ShowTab(_tab);
     }
 
-    /// <summary>Show one tab and hide the other; refresh the native Selection editor when shown.</summary>
+    /// <summary>Show one tab and hide the others; refresh the native Selection editor when shown.</summary>
     private void ShowTab(Tab tab)
     {
         _tab = tab;
@@ -115,6 +249,8 @@ public class ChromaWindow : EditorWindow
             _selectionRoot.style.display = tab == Tab.Selection ? DisplayStyle.Flex : DisplayStyle.None;
         if (_settingsRoot != null)
             _settingsRoot.style.display = tab == Tab.Settings ? DisplayStyle.Flex : DisplayStyle.None;
+        if (_lintRoot != null)
+            _lintRoot.style.display = tab == Tab.Lint ? DisplayStyle.Flex : DisplayStyle.None;
         RefreshTabClasses();
 
         if (tab == Tab.Selection)
@@ -135,8 +271,6 @@ public class ChromaWindow : EditorWindow
     /// </summary>
     private VisualElement BuildSettingsUI()
     {
-        _settingsBodies = new List<IMGUIContainer>();
-
         var rootEl = new VisualElement();
         rootEl.AddToClassList("chroma-content");
 
@@ -145,6 +279,7 @@ public class ChromaWindow : EditorWindow
         rootEl.Add(MakeFoldout("Folder colors", "folders", () => DrawPlainSection(DrawFolderColors)));
 
         rootEl.Add(MakeFoldout("Display", "display", () => DrawConfigSection(DrawToggles)));
+        rootEl.Add(MakeFoldout("Scene View", "sceneview", () => DrawConfigSection(DrawSceneViewSection)));
         rootEl.Add(MakeFoldout("Font", "font", () => DrawConfigSection(DrawFontSection)));
         rootEl.Add(MakeFoldout("Tree lines", "treelines", () => DrawConfigSection(DrawTreeLinesSection)));
         rootEl.Add(MakeFoldout("Separators", "separators", () => DrawConfigSection(DrawSeparatorsSection)));
@@ -167,6 +302,12 @@ public class ChromaWindow : EditorWindow
     {
         var fold = new Foldout { text = title };
         fold.AddToClassList("chroma-fold");
+
+        // Spectrum-distributed left accent stripe; AnimateChrome drifts it in sync with the header.
+        int accentIndex = _accentCards.Count;
+        fold.style.borderLeftWidth = 3f;
+        fold.style.borderLeftColor = Color.HSVToRGB(Mathf.Repeat(accentIndex * 0.055f, 1f), 0.7f, 0.92f);
+        _accentCards.Add(fold);
 
         string prefKey = "Chroma.Fold." + key;
         fold.value = EditorPrefs.GetBool(prefKey, true);
@@ -225,8 +366,17 @@ public class ChromaWindow : EditorWindow
     [MenuItem("Tools/Chroma")]
     private static void Open()
     {
-        var win = GetWindow<ChromaWindow>("Chroma");
-        win.minSize = new Vector2(360f, 480f);
+        try
+        {
+            var win = GetWindow<ChromaWindow>("Chroma");
+            win.minSize = new Vector2(360f, 480f);
+            win.Show();
+            win.Focus();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[Chroma] Failed to open the window:\n" + e);
+        }
     }
 
     #endregion
@@ -276,6 +426,8 @@ public class ChromaWindow : EditorWindow
         if (_tabButtons == null) return;
         _tabButtons[0].EnableInClassList("chroma-tab--active", _tab == Tab.Selection);
         _tabButtons[1].EnableInClassList("chroma-tab--active", _tab == Tab.Settings);
+        if (_tabButtons.Length > 2)
+            _tabButtons[2].EnableInClassList("chroma-tab--active", _tab == Tab.Lint);
     }
 
     /// <summary>Locate the window's USS stylesheet by name, wherever the Chroma folder lives.</summary>
@@ -891,10 +1043,37 @@ public class ChromaWindow : EditorWindow
         EditorGUILayout.PropertyField(_so.FindProperty("m_warnMissingScripts"),
             new GUIContent("Missing-script warning", "Show a warning icon on rows whose GameObject has a missing (deleted) script"));
 
+        EditorGUILayout.PropertyField(_so.FindProperty("m_showActiveToggle"),
+            new GUIContent("Active toggle", "Always-visible activation checkbox at the right edge (click toggles SetActive, with Undo)"));
+        SerializedProperty compIcons = _so.FindProperty("m_showComponentIcons");
+        EditorGUILayout.PropertyField(compIcons,
+            new GUIContent("Component icons", "Show the icons of each GameObject's components on the row"));
+        using (new EditorGUI.DisabledScope(!compIcons.boolValue))
+            EditorGUILayout.PropertyField(_so.FindProperty("m_maxComponentIcons"),
+                new GUIContent("Max icons", "Maximum number of component icons per row"));
+
         SerializedProperty zebra = _so.FindProperty("m_zebra");
         EditorGUILayout.PropertyField(zebra, new GUIContent("Zebra striping", "Alternate row backgrounds"));
         using (new EditorGUI.DisabledScope(!zebra.boolValue))
             EditorGUILayout.PropertyField(_so.FindProperty("m_zebraColor"), new GUIContent("Stripe color"));
+
+        SerializedProperty selAccent = _so.FindProperty("m_selectionAccent");
+        EditorGUILayout.PropertyField(selAccent,
+            new GUIContent("Selection accent", "Tint the selected row with the theme accent (stays visible on banner rows). Themes reseed the color"));
+        using (new EditorGUI.DisabledScope(!selAccent.boolValue))
+            EditorGUILayout.PropertyField(_so.FindProperty("m_selectionAccentColor"), new GUIContent("Accent color"));
+    }
+
+    /// <summary>Draw the Scene View section: floating colored labels and wireframe markers in the viewport.</summary>
+    private void DrawSceneViewSection()
+    {
+        EditorGUILayout.LabelField("Extend banner colors into the Scene View (editor-only, opt-in).", EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+        EditorGUILayout.PropertyField(_so.FindProperty("m_sceneLabels"),
+            new GUIContent("Floating labels", "Draw a colored name label above each banner-colored object in the Scene View"));
+        EditorGUILayout.PropertyField(_so.FindProperty("m_sceneGizmos"),
+            new GUIContent("Wireframe markers", "Draw a colored wireframe box around each banner-colored object in the Scene View"));
+        EditorGUILayout.LabelField("Only objects with a Chroma banner (name or component) are marked.", EditorStyles.miniLabel);
     }
 
     /// <summary>Draw the Font section: pick a Font asset or an installed system font for banner / separator text.</summary>
@@ -1163,20 +1342,92 @@ public class ChromaWindow : EditorWindow
         return guids;
     }
 
-    /// <summary>Draw the Themes section: buttons to apply predefined color schemes (Minimal, Vibrant, Soft, High-Contrast).</summary>
+    /// <summary>Draw the Themes section: one clickable row per scheme, each with a live palette preview.</summary>
     private void DrawThemes()
     {
-        EditorGUILayout.LabelField("One-click color schemes for tree lines, separators, and presets", EditorStyles.miniLabel);
-        EditorGUILayout.Space(3);
+        EditorGUILayout.LabelField("One-click color schemes — the swatches preview each palette.", EditorStyles.miniLabel);
         EditorGUILayout.Space(4);
+
+        DrawThemeRow("Minimal", "minimal", "Neutral dark gray, understated.");
+        DrawThemeRow("Vibrant", "vibrant", "Punchy blue / pink / green / orange.");
+        DrawThemeRow("Soft", "soft", "Light pastel, easy on the eyes.");
+        DrawThemeRow("High-Contrast", "contrast", "Maximum legibility, bold colors.");
+        DrawThemeRow("Okabe-Ito", "okabe", "Colorblind-safe (deuteranopia / protanopia) — Okabe & Ito.");
+        DrawThemeRow("IBM", "ibm", "Colorblind-safe — IBM Design Library.");
+
+        EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("More palettes", EditorStyles.boldLabel);
+        DrawThemeRow("Synthwave", "synthwave", "Sunset-grid 80s glow: hot magenta into deep violet night.");
+        DrawThemeRow("Neon Noir", "neonnoir", "Rain-and-blood noir: crimson sign over deep midnight blue.");
+        DrawThemeRow("Ocean", "ocean", "Sunlit teal shallows sinking into deep marine blue.");
+        DrawThemeRow("Autumn", "autumn", "Rust, amber and faded olive — a crisp harvest morning.");
+        DrawThemeRow("Ember", "ember", "Smoldering reds and molten orange, coals in the dark.");
+        DrawThemeRow("Solar", "solar", "Warm-based teals and amber tuned from the Solarized canon.");
+        DrawThemeRow("Teal Mono", "tealmono", "One teal hue from vivid lagoon to deep pine.");
+        DrawThemeRow("Violet Mono", "violetmono", "A violet ladder from electric amethyst to dusk plum.");
+        DrawThemeRow("Warm Gray", "warmgray", "A warm taupe grayscale with a quiet earthy undertone.");
+        DrawThemeRow("Jewel Box", "jewel", "Sapphire, ruby, emerald and amethyst edged in gold.");
+
+        EditorGUILayout.Space(2);
+        EditorGUILayout.LabelField("Okabe-Ito & IBM are colorblind-safe (~8% of men are affected).", EditorStyles.miniLabel);
+    }
+
+    /// <summary>One theme row: a name button on the left, a live palette swatch strip on the right.</summary>
+    private void DrawThemeRow(string label, string key, string tooltip)
+    {
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Minimal", GUILayout.Height(26))) ApplyTheme("minimal");
-        if (GUILayout.Button("Vibrant", GUILayout.Height(26))) ApplyTheme("vibrant");
+
+        bool apply = GUILayout.Button(new GUIContent(label, tooltip), GUILayout.Height(24), GUILayout.Width(120));
+
+        Color[] palette = ThemeSwatches(key);
+        Rect strip = GUILayoutUtility.GetRect(10f, 24f, GUILayout.ExpandWidth(true));
+        // Rounded backing so the swatch strip reads as a single pill.
+        EditorGUI.DrawRect(new Rect(strip.x, strip.y + 3f, strip.width, strip.height - 6f), new Color(0f, 0f, 0f, 0.25f));
+        const float pad = 2f;
+        float w = (strip.width - pad * (palette.Length - 1)) / palette.Length;
+        for (int i = 0; i < palette.Length; i++)
+        {
+            var sw = new Rect(strip.x + i * (w + pad), strip.y + 4f, w, strip.height - 8f);
+            EditorGUI.DrawRect(sw, palette[i]);
+        }
+
         EditorGUILayout.EndHorizontal();
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Soft", GUILayout.Height(26))) ApplyTheme("soft");
-        if (GUILayout.Button("High-Contrast", GUILayout.Height(26))) ApplyTheme("contrast");
-        EditorGUILayout.EndHorizontal();
+        if (apply) ApplyTheme(key);
+    }
+
+    /// <summary>The representative swatch colors for a theme key (h1, h2, h3, category), for previewing.</summary>
+    private static Color[] ThemeSwatches(string theme)
+    {
+        string[] hex;
+        switch (theme)
+        {
+            case "minimal":    hex = new[] { "#3a3f44", "#4a4f55", "#2c2f33", "#33363a" }; break;
+            case "vibrant":    hex = new[] { "#1f6feb", "#e0457b", "#1ca672", "#f0883e" }; break;
+            case "soft":       hex = new[] { "#6ea8fe", "#f4a6c0", "#8fd3b6", "#f6c08a" }; break;
+            case "contrast":   hex = new[] { "#0a84ff", "#ff375f", "#30d158", "#ff9f0a" }; break;
+            case "okabe":      hex = new[] { "#0072B2", "#E69F00", "#009E73", "#56B4E9" }; break;
+            case "ibm":        hex = new[] { "#648FFF", "#DC267F", "#785EF0", "#FE6100" }; break;
+            case "synthwave":  hex = new[] { "#d6216b", "#7b2ff7", "#3a2b66", "#1b1233" }; break;
+            case "neonnoir":   hex = new[] { "#b3194d", "#2563b8", "#241a30", "#100a16" }; break;
+            case "ocean":      hex = new[] { "#0e7c8a", "#1565a8", "#2a4a6e", "#16303f" }; break;
+            case "autumn":     hex = new[] { "#a84d1c", "#9c6b1a", "#6e6320", "#3a2a18" }; break;
+            case "ember":      hex = new[] { "#cf2f2f", "#9e2418", "#6e1f12", "#3d140c" }; break;
+            case "solar":      hex = new[] { "#1f7fc4", "#a85a1a", "#586e75", "#073642" }; break;
+            case "tealmono":   hex = new[] { "#178079", "#1a7470", "#155553", "#143e3d" }; break;
+            case "violetmono": hex = new[] { "#7a4fd0", "#634099", "#4a3270", "#352450" }; break;
+            case "warmgray":   hex = new[] { "#6e6258", "#5a5048", "#453d37", "#332d29" }; break;
+            case "jewel":      hex = new[] { "#1d4ed8", "#b91c4b", "#0f766e", "#6d28d9" }; break;
+            default:           hex = new[] { "#888888" }; break;
+        }
+        var cols = new Color[hex.Length];
+        for (int i = 0; i < hex.Length; i++) ChromaHeaders.TryGetColor(hex[i], out cols[i]);
+        return cols;
+    }
+
+    /// <summary>Parse a hex color (e.g. "#1f6feb"); returns gray if it fails to parse.</summary>
+    private static Color Hex(string hex)
+    {
+        return ChromaHeaders.TryGetColor(hex, out Color c) ? c : new Color(0.5f, 0.5f, 0.5f);
     }
 
     /// <summary>Apply a preset theme: update tree line color, separator style, and presets.</summary>
@@ -1214,6 +1465,106 @@ public class ChromaWindow : EditorWindow
                 _config.m_separatorStyle = SeparatorStyle.Double;
                 _config.m_presets = ThemePresets("#0a84ff", "#ff375f", "#30d158", "#ff9f0a", "#0a84ff>#bf5af2");
                 break;
+            case "okabe":
+                // Okabe & Ito palette: distinguishable under deuteranopia / protanopia / tritanopia.
+                _config.m_treeLineColor = new Color(1f, 1f, 1f, 0.18f);
+                _config.m_separatorColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                _config.m_separatorFillColor = new Color(0.20f, 0.20f, 0.20f, 1f);
+                _config.m_separatorStyle = SeparatorStyle.Solid;
+                _config.m_presets = ThemePresets("#0072B2", "#E69F00", "#009E73", "#56B4E9", "#0072B2>#D55E00");
+                break;
+            case "ibm":
+                // IBM Design Library colorblind-safe palette.
+                _config.m_treeLineColor = new Color(1f, 1f, 1f, 0.18f);
+                _config.m_separatorColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                _config.m_separatorFillColor = new Color(0.18f, 0.18f, 0.22f, 1f);
+                _config.m_separatorStyle = SeparatorStyle.Solid;
+                _config.m_presets = ThemePresets("#648FFF", "#DC267F", "#785EF0", "#FE6100", "#648FFF>#FFB000");
+                break;
+
+            // ---- Extended palettes (white-text-legible banner backgrounds) ----
+            case "synthwave":
+                _config.m_treeLineColor = new Color(1f, 0.27f, 0.6f, 0.22f);
+                _config.m_separatorColor = Hex("#ff5fb0");
+                _config.m_separatorFillColor = Hex("#1b1233");
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#d6216b", "#7b2ff7", "#3a2b66", "#1b1233", "#e02478>#5a1e96");
+                break;
+            case "neonnoir":
+                _config.m_treeLineColor = new Color(0.85f, 0.18f, 0.42f, 0.16f);
+                _config.m_separatorColor = Hex("#ff3d7f");
+                _config.m_separatorFillColor = Hex("#100a16");
+                _config.m_separatorStyle = SeparatorStyle.Solid;
+                _config.m_presets = ThemePresets("#b3194d", "#2563b8", "#241a30", "#100a16", "#cc1259>#1c3a8f");
+                break;
+            case "ocean":
+                _config.m_treeLineColor = new Color(0.32f, 0.58f, 0.64f, 0.24f);
+                _config.m_separatorColor = Hex("#54c9d6");
+                _config.m_separatorFillColor = Hex("#0e1f2a");
+                _config.m_separatorStyle = SeparatorStyle.Dotted;
+                _config.m_presets = ThemePresets("#0e7c8a", "#1565a8", "#2a4a6e", "#16303f", "#0e7c8a>#1d3a78");
+                break;
+            case "autumn":
+                _config.m_treeLineColor = new Color(0.7f, 0.45f, 0.2f, 0.22f);
+                _config.m_separatorColor = Hex("#e0913f");
+                _config.m_separatorFillColor = Hex("#2a1d12");
+                _config.m_separatorStyle = SeparatorStyle.Dashed;
+                _config.m_presets = ThemePresets("#a84d1c", "#9c6b1a", "#6e6320", "#3a2a18", "#a84d1c>#5c5a1e");
+                break;
+            case "ember":
+                _config.m_treeLineColor = new Color(0.85f, 0.35f, 0.2f, 0.22f);
+                _config.m_separatorColor = Hex("#ff6a3c");
+                _config.m_separatorFillColor = Hex("#2a0d08");
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#cf2f2f", "#9e2418", "#6e1f12", "#3d140c", "#d63e1c>#7a160d");
+                break;
+            case "solar":
+                _config.m_treeLineColor = new Color(0.51f, 0.58f, 0.59f, 0.22f);
+                _config.m_separatorColor = Hex("#2aa198");
+                _config.m_separatorFillColor = Hex("#002b36");
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#1f7fc4", "#a85a1a", "#586e75", "#073642", "#1f7fc4>#1a5a78");
+                break;
+            case "tealmono":
+                _config.m_treeLineColor = new Color(0.36f, 0.75f, 0.7f, 0.18f);
+                _config.m_separatorColor = Hex("#74c9bf");
+                _config.m_separatorFillColor = Hex("#102826");
+                _config.m_separatorStyle = SeparatorStyle.Dashed;
+                _config.m_presets = ThemePresets("#178079", "#1a7470", "#155553", "#143e3d", "#178079>#123f3e");
+                break;
+            case "violetmono":
+                _config.m_treeLineColor = new Color(0.62f, 0.5f, 0.86f, 0.2f);
+                _config.m_separatorColor = Hex("#b79ae8");
+                _config.m_separatorFillColor = Hex("#211633");
+                _config.m_separatorStyle = SeparatorStyle.Dotted;
+                _config.m_presets = ThemePresets("#7a4fd0", "#634099", "#4a3270", "#352450", "#8a5be0>#352450");
+                break;
+            case "warmgray":
+                _config.m_treeLineColor = new Color(0.78f, 0.72f, 0.64f, 0.16f);
+                _config.m_separatorColor = Hex("#c2b6a8");
+                _config.m_separatorFillColor = Hex("#241f1c");
+                _config.m_separatorStyle = SeparatorStyle.Solid;
+                _config.m_presets = ThemePresets("#6e6258", "#5a5048", "#453d37", "#332d29", "#776a5e>#332d29");
+                break;
+            case "jewel":
+                _config.m_treeLineColor = new Color(0.55f, 0.4f, 0.9f, 0.22f);
+                _config.m_separatorColor = Hex("#c4a747");
+                _config.m_separatorFillColor = Hex("#1a1424");
+                _config.m_separatorStyle = SeparatorStyle.Double;
+                _config.m_presets = ThemePresets("#1d4ed8", "#b91c4b", "#0f766e", "#6d28d9", "#1d4ed8>#9d174d");
+                break;
+        }
+
+        // Theme completeness: reseed palette-derived colors from the theme's primary (h1) color,
+        // so zebra striping and the selection accent stay on-palette across all themes.
+        if (_config.m_presets != null && _config.m_presets.Count > 0 && _config.m_presets[0] != null)
+        {
+            string h1Token = (_config.m_presets[0].m_spec ?? "").Split(' ')[0];
+            if (ChromaHeaders.TryGetColor(h1Token, out Color accent))
+            {
+                _config.m_zebraColor = new Color(accent.r, accent.g, accent.b, 0.05f);
+                _config.m_selectionAccentColor = new Color(accent.r, accent.g, accent.b, 0.18f);
+            }
         }
 
         _config.m_version++;
@@ -1384,6 +1735,255 @@ public class ChromaWindow : EditorWindow
     #endregion
 
 
+    #region Lint tab
+
+    /// <summary>Build the Lint tab: violations list, team rules editor, and linter options.</summary>
+    private VisualElement BuildLintUI()
+    {
+        var rootEl = new VisualElement();
+        rootEl.AddToClassList("chroma-content");
+
+        rootEl.Add(MakeFoldout("Violations", "lintviolations", () => DrawPlainSection(DrawLintViolations)));
+        rootEl.Add(MakeFoldout("Rules", "lintrules", () => DrawConfigSection(DrawLintRules)));
+        rootEl.Add(MakeFoldout("Options", "lintoptions", () => DrawConfigSection(DrawLintOptions)));
+
+        return rootEl;
+    }
+
+    /// <summary>Draw the live violation list, grouped by rule, with jump / select / ignore actions.</summary>
+    private void DrawLintViolations()
+    {
+        int errors = ChromaLinter.ErrorCount, warnings = ChromaLinter.WarningCount, infos = ChromaLinter.InfoCount;
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField(
+            errors + " error(s)  ·  " + warnings + " warning(s)  ·  " + infos + " info", EditorStyles.boldLabel);
+        if (GUILayout.Button("Rescan", GUILayout.Width(70)))
+            ChromaLinter.ScanNow();
+        EditorGUILayout.EndHorizontal();
+
+        if (!_config.m_enableLint)
+        {
+            EditorGUILayout.HelpBox("The linter is disabled (see Options below).", MessageType.Info);
+            return;
+        }
+        if (_config.m_lintRules == null || _config.m_lintRules.Count == 0)
+        {
+            EditorGUILayout.HelpBox("No rules yet. Add one below or load a ruleset.", MessageType.Info);
+            return;
+        }
+        if (ChromaLinter.Truncated)
+            EditorGUILayout.HelpBox("Scan stopped after 500 flagged objects — fix some and rescan.", MessageType.Warning);
+
+        if (ChromaLinter.Total == 0)
+        {
+            EditorGUILayout.LabelField("No violations — the scene matches the team conventions. ✔", EditorStyles.miniLabel);
+            return;
+        }
+
+        // Group instanceIDs by rule id (an object can appear under several rules).
+        _lintGroups.Clear();
+        foreach (var kv in ChromaLinter.All)
+        {
+            List<ChromaLinter.Violation> list = kv.Value;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!_lintGroups.TryGetValue(list[i].m_ruleId, out List<int> ids))
+                {
+                    ids = new List<int>();
+                    _lintGroups[list[i].m_ruleId] = ids;
+                }
+                ids.Add(kv.Key);
+            }
+        }
+
+        int shown = 0;
+        bool capped = false;
+        foreach (var group in _lintGroups)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(group.Key + "  (" + group.Value.Count + ")", EditorStyles.boldLabel);
+            if (GUILayout.Button("Select all", GUILayout.Width(72)))
+            {
+                var gos = new List<UnityEngine.Object>(group.Value.Count);
+                foreach (int id in group.Value)
+                {
+#pragma warning disable 618
+                    var go = EditorUtility.InstanceIDToObject(id) as GameObject;
+#pragma warning restore 618
+                    if (go != null) gos.Add(go);
+                }
+                Selection.objects = gos.ToArray();
+            }
+            EditorGUILayout.EndHorizontal();
+
+            foreach (int id in group.Value)
+            {
+                if (shown >= 100) { capped = true; break; }
+#pragma warning disable 618
+                GameObject go = EditorUtility.InstanceIDToObject(id) as GameObject;
+#pragma warning restore 618
+                if (go == null) continue;
+                shown++;
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button(go.name, EditorStyles.label, GUILayout.ExpandWidth(true)))
+                    ChromaBookmarks.Jump(go);
+                if (GUILayout.Button("Ignore", GUILayout.Width(52)))
+                    ChromaLinter.ToggleIgnore(go);
+                EditorGUILayout.EndHorizontal();
+            }
+            if (capped) break;
+        }
+
+        if (capped)
+            EditorGUILayout.LabelField("…list capped at 100 rows.", EditorStyles.miniLabel);
+
+        if (ChromaLinter.IgnoreCount > 0)
+        {
+            EditorGUILayout.Space(2);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(ChromaLinter.IgnoreCount + " object(s) ignored locally (per-user).",
+                EditorStyles.miniLabel);
+            if (GUILayout.Button("Clear ignores", GUILayout.Width(96)))
+                ChromaLinter.ClearIgnores();
+            EditorGUILayout.EndHorizontal();
+        }
+    }
+
+    /// <summary>Draw the team rule editor: one card per rule (scope, assertion, severity, message).</summary>
+    private void DrawLintRules()
+    {
+        EditorGUILayout.LabelField("Rules live in the shared config — the whole team gets them via git.",
+            EditorStyles.miniLabel);
+        EditorGUILayout.Space(3);
+
+        SerializedProperty rules = _so.FindProperty("m_lintRules");
+
+        for (int i = 0; i < rules.arraySize; i++)
+        {
+            SerializedProperty el = rules.GetArrayElementAtIndex(i);
+            SerializedProperty enabled = el.FindPropertyRelative("m_enabled");
+            SerializedProperty id = el.FindPropertyRelative("m_id");
+            SerializedProperty severity = el.FindPropertyRelative("m_severity");
+            SerializedProperty scope = el.FindPropertyRelative("m_scope");
+            SerializedProperty scopeValue = el.FindPropertyRelative("m_scopeValue");
+            SerializedProperty assert = el.FindPropertyRelative("m_assert");
+            SerializedProperty assertValue = el.FindPropertyRelative("m_assertValue");
+            SerializedProperty message = el.FindPropertyRelative("m_message");
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.BeginHorizontal();
+            enabled.boolValue = EditorGUILayout.Toggle(enabled.boolValue, GUILayout.Width(16));
+            id.stringValue = EditorGUILayout.TextField(id.stringValue);
+            EditorGUILayout.PropertyField(severity, GUIContent.none, GUILayout.Width(70));
+            bool remove = GUILayout.Button("X", GUILayout.Width(22));
+            EditorGUILayout.EndHorizontal();
+
+            using (new EditorGUI.DisabledScope(!enabled.boolValue))
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("On", GUILayout.Width(34));
+                EditorGUILayout.PropertyField(scope, GUIContent.none, GUILayout.Width(90));
+                bool scopeNeedsValue = scope.enumValueIndex != (int)LintScope.All
+                                       && scope.enumValueIndex != (int)LintScope.RootOnly;
+                using (new EditorGUI.DisabledScope(!scopeNeedsValue))
+                    scopeValue.stringValue = EditorGUILayout.TextField(scopeValue.stringValue);
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Check", GUILayout.Width(40));
+                EditorGUILayout.PropertyField(assert, GUIContent.none, GUILayout.Width(120));
+                bool assertNeedsValue = assert.enumValueIndex == (int)LintAssert.NameRegex
+                                        || assert.enumValueIndex == (int)LintAssert.RequiredParent
+                                        || assert.enumValueIndex == (int)LintAssert.MaxDepth;
+                using (new EditorGUI.DisabledScope(!assertNeedsValue))
+                    assertValue.stringValue = EditorGUILayout.TextField(assertValue.stringValue);
+                EditorGUILayout.EndHorizontal();
+
+                message.stringValue = EditorGUILayout.TextField(message.stringValue);
+            }
+
+            EditorGUILayout.EndVertical();
+
+            if (remove)
+            {
+                rules.DeleteArrayElementAtIndex(i);
+                break;
+            }
+        }
+
+        EditorGUILayout.Space(2);
+        if (GUILayout.Button("+ Add rule"))
+        {
+            int idx = rules.arraySize;
+            rules.arraySize++;
+            SerializedProperty el = rules.GetArrayElementAtIndex(idx);
+            el.FindPropertyRelative("m_enabled").boolValue = true;
+            el.FindPropertyRelative("m_id").stringValue = "rule-" + (idx + 1);
+            el.FindPropertyRelative("m_severity").enumValueIndex = (int)LintSeverity.Warning;
+            el.FindPropertyRelative("m_scope").enumValueIndex = (int)LintScope.All;
+            el.FindPropertyRelative("m_scopeValue").stringValue = "";
+            el.FindPropertyRelative("m_assert").enumValueIndex = (int)LintAssert.NoDefaultName;
+            el.FindPropertyRelative("m_assertValue").stringValue = "";
+            el.FindPropertyRelative("m_message").stringValue = "";
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Load starter ruleset")) LoadRuleset(ChromaConfig.StarterLintRules());
+        if (GUILayout.Button("Load strict ruleset")) LoadRuleset(ChromaConfig.StrictLintRules());
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField("Loading a ruleset adds the rules your config is missing (matched by id).",
+            EditorStyles.miniLabel);
+    }
+
+    /// <summary>Append the given rules to the config, skipping ids that already exist.</summary>
+    private void LoadRuleset(List<ChromaConfig.LintRule> rules)
+    {
+        _so.ApplyModifiedProperties(); // flush pending field edits first
+
+        Undo.RecordObject(_config, "Chroma: load lint ruleset");
+        if (_config.m_lintRules == null) _config.m_lintRules = new List<ChromaConfig.LintRule>();
+
+        foreach (ChromaConfig.LintRule rule in rules)
+        {
+            bool exists = false;
+            foreach (ChromaConfig.LintRule existing in _config.m_lintRules)
+            {
+                if (existing != null && string.Equals(existing.m_id, rule.m_id, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) _config.m_lintRules.Add(rule);
+        }
+
+        _config.m_version++;
+        EditorUtility.SetDirty(_config);
+        _so.Update();
+        ChromaHeaders.OnConfigChanged(_config);
+        RepaintSettings();
+    }
+
+    /// <summary>Draw the linter options: master toggle and Hierarchy icon visibility.</summary>
+    private void DrawLintOptions()
+    {
+        EditorGUILayout.PropertyField(_so.FindProperty("m_enableLint"),
+            new GUIContent("Enable linter", "Scan open scenes against the team's lint rules"));
+        EditorGUILayout.PropertyField(_so.FindProperty("m_lintShowIcons"),
+            new GUIContent("Icons in Hierarchy", "Show a severity icon (with tooltip) on offending rows"));
+        EditorGUILayout.LabelField("Scanning pauses during play mode. 'Ignore' opt-outs are per-user.",
+            EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("Tip: bind 'Chroma/Next Lint Violation' in Edit > Shortcuts.",
+            EditorStyles.miniLabel);
+    }
+
+    #endregion
+
+
     #region Tools and Utilities
 
     /// <summary>Lazily build the installed-system-font lists (value + display), with "(default)" at index 0.</summary>
@@ -1522,11 +2122,20 @@ public class ChromaWindow : EditorWindow
 
     // UI Toolkit chrome.
     private Button[] _tabButtons;
+    private VisualElement _header;
+    private IMGUIContainer _rainbow;
+    private readonly List<VisualElement> _accentCards = new List<VisualElement>();
+    private double _lastAnim;
+    private double _lastAccent;
     private VisualElement _selectionRoot;
     private VisualElement _settingsRoot;
+    private VisualElement _lintRoot;
     private List<IMGUIContainer> _settingsBodies;
     private IMGUIContainer _selExtras;
     private bool _refreshing;
+
+    // Scratch map rebuilt on every Lint-tab repaint (ruleId -> flagged instanceIDs).
+    private readonly Dictionary<string, List<int>> _lintGroups = new Dictionary<string, List<int>>();
 
     // Native Selection-tab controls.
     private Label _uiStatus;

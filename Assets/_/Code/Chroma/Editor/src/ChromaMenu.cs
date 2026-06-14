@@ -63,6 +63,19 @@ public static class ChromaMenu
         EditorApplication.RepaintHierarchyWindow();
     }
 
+    [MenuItem("GameObject/Chroma/Lint - Toggle Ignore", true)]
+    private static bool ValidateLintIgnore() => Selection.activeGameObject != null;
+
+    // Per-user opt-out: the linter skips ignored objects (rules stay shared in the config).
+    [MenuItem("GameObject/Chroma/Lint - Toggle Ignore", false, 220)]
+    private static void MenuLintIgnore()
+    {
+        GameObject[] sel = Selection.gameObjects;
+        if (sel == null) return;
+        for (int i = 0; i < sel.Length; i++)
+            ChromaLinter.ToggleIgnore(sel[i]);
+    }
+
     [MenuItem("GameObject/Chroma/Open Window", false, 230)]
     private static void MenuOpenWindow() => OpenWindow();
 
@@ -100,6 +113,10 @@ public static class ChromaMenu
     // Bindable but unassigned by default — the user picks a key in Edit > Shortcuts.
     [Shortcut("Chroma/Open Window")]
     private static void ShortcutOpenWindow() => OpenWindow();
+
+    // Cycles the selection through lint violations. Unassigned by default.
+    [Shortcut("Chroma/Next Lint Violation")]
+    private static void ShortcutNextViolation() => ChromaLinter.JumpToNext();
 
     #endregion
 
