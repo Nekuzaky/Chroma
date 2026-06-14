@@ -8,7 +8,7 @@ namespace Chroma.Editor
 public static class ChromaUpdateNotifier
 {
     private const string PREF_KEY = "Chroma_LastSeenVersion";
-    private const string CURRENT_VERSION = "0.2.0";
+    private const string CURRENT_VERSION = "0.3.0";
 
     static ChromaUpdateNotifier()
     {
@@ -42,68 +42,50 @@ public static class ChromaUpdateNotifier
         return $@"Welcome to Chroma {CURRENT_VERSION}! 🎉
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎨 MAJOR: RGB THEMES
+🚨 NEW: CONVENTION LINTER
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Three new animated color themes for the Hierarchy:
+Chroma now ENFORCES your team's scene conventions:
+define rules (scope + assertion + severity) and offending
+rows get an inline severity icon with the rule's message.
 
-🎃 Halloween
-   → Orange, Violet, Black cycling
-
-🎄 Christmas
-   → Red, Green, Gold cycling
-
-💝 Valentine
-   → Deep Red, Hot Pink, Magenta cycling
-
-All themes respect speed/spread settings and work on both
-Hierarchy and Project window folders.
-
-Access: Settings > RGB mode > Theme dropdown
+✓ 7 assertions: HasBanner, NameRegex, NoEmpty,
+   NoMissingScript, RequiredParent, MaxDepth, NoDefaultName
+✓ New ""Lint"" tab: live violation list, jump / select /
+   ignore, team rule editor, ready-made rulesets
+✓ Rules live in the shared config — committed via git,
+   the whole team stays aligned
+✓ Per-user ignores + ""Next Lint Violation"" shortcut
+✓ Debounced scans, O(1) per-row lookups, paused in play
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 SECURITY HARDENING
+🧩 NEW: ROW WIDGETS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ ReDoS Protection
-   Regex patterns now have 500ms timeout to prevent
-   Editor freezes on complex patterns
-
-✓ Safe Deserialization
-   Config imports are validated and clamped to safe ranges:
-   - Regex patterns: max 100 chars
-   - Numeric values: clamped to valid ranges
-   - String lengths: limited to prevent memory issues
-
-✓ Path Traversal Prevention
-   Config imports restricted to project folder only
-
-✓ Editor-Only Safeguards
-   Prevents accidental use of Editor-only code in builds
-
-✓ Event Deduplication
-   Fixed event subscription accumulation on assembly reload
+✓ Active toggle — always-visible checkbox on every row
+   (click = SetActive with full Undo support)
+✓ Component icons — see each object's components at a
+   glance (cached, capped, configurable)
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🐛 BUG FIXES & IMPROVEMENTS
+🎨 NEW: COLORBLIND-SAFE THEMES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Substring Parsing
-   Fixed edge cases with ""text:"" and ""t:"" specs
+Two CVD-safe palettes in Settings > Themes:
+✓ Okabe-Ito (deuteranopia / protanopia / tritanopia safe)
+✓ IBM Design Library
 
-✓ Config Validation
-   New ValidateAndClamp() function ensures all imported
-   configurations are safe and within valid ranges
 
-✓ Performance
-   RGB themed modes run at 30% slower speed for smoother
-   color transitions (configurable via Speed slider)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🐛 FIXES & POLISH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Auto-Migration System
-   Old configs automatically upgrade to new versions
-   without losing user settings
+✓ Missing-script icon now shows its tooltip
+✓ Config schema version separated from the edit counter
+   (real migrations are now possible)
+✓ Component caches refresh on component add/remove
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

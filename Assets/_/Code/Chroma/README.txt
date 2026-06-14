@@ -1,8 +1,8 @@
-CHROMA 0.2.0
+CHROMA 0.3.0
 ================================================================================
 
-Editor-only Unity extension that color-codes your Hierarchy and Project folders
-so large scenes stay readable — with zero runtime cost.
+Editor-only Unity extension that color-codes your Hierarchy and Project folders,
+and enforces your team's scene conventions — with zero runtime cost.
 
 QUICK START
 -----------
@@ -28,6 +28,15 @@ FEATURES
   - By name: rename like "#1f6feb center bold=Title" (solid color or gradients)
   - By component: add ChromaBanner component (keeps the GameObject name clean)
 
+• Convention Linter — Enforce team conventions: shared rules (scope + assertion +
+  severity + message) flag violations inline in the Hierarchy and in a Lint tab
+  (HasBanner, NameRegex, NoEmpty, NoMissingScript, RequiredParent, MaxDepth,
+  NoDefaultName). Per-user ignores + a Next-Violation shortcut.
+
+• Row Widgets — Always-visible active toggle (SetActive + Undo) and component icons
+
+• Selection Accent — Theme-colored tint on the selected row (visible on banners too)
+
 • Separators — Create visual dividers by naming objects "---" or "___"
 
 • Custom Banner Font — Use a Font asset or any installed system font
@@ -44,9 +53,15 @@ FEATURES
 
 • Project Window — Color folders in the Project window
 
-• RGB Mode — Animate hierarchy rows through rainbow colors (~30fps)
+• Scene View — Opt-in floating colored labels + wireframe markers for banner-colored
+  objects, a "Chroma Bookmarks" overlay, and a Set Scene Icon command
 
-• Themes — Quick preset color schemes (Minimal, Vibrant, Soft, High-Contrast)
+• RGB Mode — Animate rows through rainbow colors (~30fps), 14 themes
+  (Classic, Halloween, Christmas, Valentine, Matrix, Corrupted, Funny, Fast Food,
+  Candy, Police, Fire, Ice, Toxic, Rave)
+
+• Themes — 16 color schemes with palette previews, incl. colorblind-safe
+  Okabe-Ito & IBM. Animated window UI.
 
 • Build Stripping — Banners are removed from built scenes (zero runtime footprint)
 

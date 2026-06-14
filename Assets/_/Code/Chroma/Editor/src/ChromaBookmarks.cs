@@ -14,6 +14,9 @@ public static class ChromaBookmarks
 
     public static IReadOnlyList<string> Gids => _gids;
 
+    /// <summary>Raised when the bookmark list changes (add / remove / reorder / load). Used by the Scene View overlay.</summary>
+    public static event Action Changed;
+
     #endregion
 
 
@@ -154,12 +157,14 @@ public static class ChromaBookmarks
         if (!string.IsNullOrEmpty(raw))
             _gids.AddRange(raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
         RebuildIdCache();
+        Changed?.Invoke();
         EditorApplication.RepaintHierarchyWindow();
     }
 
     private static void Save()
     {
         EditorPrefs.SetString(Key, string.Join(";", _gids));
+        Changed?.Invoke();
     }
 
     private static void RebuildIdCache()

@@ -1,13 +1,19 @@
 /* Chroma editor window — modern UI Toolkit chrome. */
 
+/* ============================ Header ============================ */
+
 .chroma-header {
-    background-color: rgb(35, 39, 47);
-    padding-top: 10px;
-    padding-bottom: 10px;
-    padding-left: 14px;
-    padding-right: 14px;
-    border-bottom-width: 2px;
-    border-bottom-color: rgb(54 59 67);
+    background-color: rgb(28, 31, 38);
+    padding-top: 12px;
+    padding-bottom: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-bottom-width: 0;
+}
+
+/* Full-bleed animated rainbow divider painted in C# (Chroma's signature). */
+.chroma-rainbow {
+    height: 3px;
 }
 
 .chroma-titlerow {
@@ -15,72 +21,93 @@
     align-items: center;
 }
 
-
-
 .chroma-title {
-    font-size: 15px;
+    font-size: 18px;
     -unity-font-style: bold;
-    color: rgb(255 255 255);
+    letter-spacing: 1px;
+    color: rgb(255, 255, 255);
 }
 
 .chroma-sub {
     font-size: 10px;
-    margin-top: 1px;
-    color: rgba(255, 255, 255, 0.55);
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+    color: rgba(255, 255, 255, 0.45);
 }
 
 .chroma-search {
-    margin-top: 8px;
-    border-radius: 6px;
+    margin-top: 11px;
+    border-radius: 7px;
 }
+
+/* ============================ Tab bar ============================ */
+/* A contained "segmented control": pill track + sliding active pill. */
 
 .chroma-tabbar {
     flex-direction: row;
-    padding-top: 6px;
-    padding-bottom: 4px;
-    padding-left: 6px;
-    padding-right: 6px;
+    margin-top: 8px;
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-bottom: 2px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 3px;
+    padding-right: 3px;
+    background-color: rgba(255, 255, 255, 0.045);
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .chroma-tab {
     flex-grow: 1;
-    height: 26px;
-    margin-left: 3px;
-    margin-right: 3px;
+    height: 27px;
+    margin-left: 2px;
+    margin-right: 2px;
     border-width: 0;
-    border-radius: 6px;
+    border-radius: 7px;
     background-color: rgba(0, 0, 0, 0);
+    color: rgba(255, 255, 255, 0.62);
     -unity-text-align: middle-center;
     transition-duration: 0.12s;
 }
 
 .chroma-tab:hover {
-    background-color: rgba(127, 127, 127, 0.18);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgb(255, 255, 255);
 }
 
 .chroma-tab--active {
-    background-color: rgb(65 68 80);
+    background-color: rgb(78, 112, 236);
     color: rgb(255, 255, 255);
     -unity-font-style: bold;
 }
 
-.chroma-content {
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-bottom: 8px;
-    padding-top: 4px;
+.chroma-tab--active:hover {
+    background-color: rgb(96, 128, 245);
 }
 
-/* --- Native Selection tab --- */
+/* ============================ Content ============================ */
 
-.chroma-card {
-    background-color: rgba(127, 127, 127, 0.08);
-    border-radius: 8px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+.chroma-content {
     padding-left: 10px;
     padding-right: 10px;
-    margin-bottom: 6px;
+    padding-bottom: 10px;
+    padding-top: 6px;
+}
+
+/* ===================== Selection card ===================== */
+
+.chroma-card {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.06);
+    padding-top: 12px;
+    padding-bottom: 12px;
+    padding-left: 12px;
+    padding-right: 12px;
+    margin-bottom: 8px;
 }
 
 .chroma-hint {
@@ -88,86 +115,126 @@
     white-space: normal;
     margin-top: 2px;
     margin-bottom: 2px;
-    color: rgba(127, 127, 127, 0.95);
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .chroma-preview {
     height: 38px;
-    margin-top: 4px;
-    margin-bottom: 6px;
+    margin-top: 6px;
+    margin-bottom: 8px;
+    border-radius: 6px;
 }
 
 .chroma-indent {
     margin-left: 12px;
+    padding-left: 8px;
+    border-left-width: 1px;
+    border-left-color: rgba(255, 255, 255, 0.07);
+    margin-top: 2px;
+    margin-bottom: 2px;
 }
+
+/* "Store as" segmented control */
 
 .chroma-storerow {
     flex-direction: row;
     align-items: center;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .chroma-storelabel {
     width: 120px;
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .chroma-seg {
     flex-grow: 1;
-    height: 22px;
+    height: 23px;
     margin-left: 2px;
     margin-right: 2px;
     border-width: 0;
-    border-radius: 5px;
-    background-color: rgba(127, 127, 127, 0.15);
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.06);
     -unity-text-align: middle-center;
-    
     transition-duration: 0.1s;
 }
 
 .chroma-seg:hover {
-    background-color: rgba(127, 127, 127, 0.28);
+    background-color: rgba(255, 255, 255, 0.12);
 }
 
 .chroma-seg--active {
-    background-color: rgb(93 96 112);
+    background-color: rgb(78, 112, 236);
     color: rgb(255, 255, 255);
     -unity-font-style: bold;
 }
 
+/* Primary action button */
+
 .chroma-apply {
-    height: 30px;
-    margin-top: 8px;
+    height: 31px;
+    margin-top: 10px;
     border-width: 0;
-    border-radius: 6px;
-    background-color: rgb(84 87 101);
+    border-radius: 7px;
+    background-color: rgb(78, 112, 236);
     color: rgb(255, 255, 255);
     -unity-font-style: bold;
+    transition-duration: 0.1s;
 }
 
 .chroma-apply:hover {
-    background-color: rgb(104 112 122);
+    background-color: rgb(96, 128, 245);
 }
 
 .chroma-apply:disabled {
-    background-color: rgba(127, 127, 127, 0.25);
-    color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
     -unity-font-style: normal;
 }
 
-/* --- Native Settings foldouts --- */
+/* ===================== Settings / Lint foldout cards ===================== */
+/* Each section becomes a rounded card so sections read as distinct blocks. */
 
 .chroma-fold {
-    margin-top: 4px;
-    margin-bottom: 2px;
+    margin-top: 0;
+    margin-bottom: 7px;
+    background-color: rgba(255, 255, 255, 0.035);
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.06);
 }
 
-.chroma-fold > .unity-foldout__toggle > .unity-toggle__input > .unity-label {
+.chroma-fold > .unity-foldout__toggle {
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+    transition-duration: 0.1s;
+}
+
+.chroma-fold > .unity-foldout__toggle:hover {
+    background-color: rgba(255, 255, 255, 0.045);
+}
+
+.chroma-fold .unity-foldout__toggle > .unity-toggle__input > .unity-label {
     -unity-font-style: bold;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* Drop the default foldout indent so the body uses the full card width. */
+.chroma-fold > .unity-foldout__content {
+    margin-left: 0;
 }
 
 .chroma-fold-body {
     padding-top: 4px;
-    padding-bottom: 6px;
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-bottom: 9px;
+    padding-left: 11px;
+    padding-right: 11px;
 }

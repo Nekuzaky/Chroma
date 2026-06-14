@@ -7,7 +7,15 @@ namespace Chroma.Editor
 public enum ChildInheritMode { Flat, DepthFade }
 public enum AutoColorMatch { Tag, Layer, NamePrefix, Regex }
 public enum SeparatorStyle { Solid, Dashed, Dotted, Double }
-public enum RGBTheme { Classic, Halloween, Christmas, Valentine }
+// NOTE: append new values at the END only — RGBTheme is serialized by index.
+public enum RGBTheme { Classic, Halloween, Christmas, Valentine, Matrix, Corrupted, Funny, FastFood, Candy, Police, Fire, Ice, Toxic, Rave }
+
+/// <summary>Severity of a lint rule violation. Order matters: higher = worse.</summary>
+public enum LintSeverity { Info, Warning, Error }
+/// <summary>Which objects a lint rule applies to.</summary>
+public enum LintScope { All, RootOnly, Tag, Layer, NamePrefix, Regex }
+/// <summary>What must hold for objects in a lint rule's scope.</summary>
+public enum LintAssert { HasBanner, NameRegex, NoEmpty, NoMissingScript, RequiredParent, MaxDepth, NoDefaultName }
 
 /// <summary>
 /// Persisted Chroma configuration asset. Controls hierarchy and folder colors, tree lines, separators,
@@ -59,6 +67,46 @@ public class ChromaConfig : ScriptableObject
         [System.NonSerialized] internal string m_cachedRegexFor;
     }
 
+    /// <summary>
+    /// Convention-linter rule: a scope (which objects), an assertion (what must hold),
+    /// a severity and a message. Violations are surfaced inline in the Hierarchy and in the
+    /// window's Lint tab. Rules live in the shared config, so the whole team is aligned.
+    /// </summary>
+    [System.Serializable]
+    public class LintRule
+    {
+        /// <summary>Enable/disable this rule without removing it.</summary>
+        public bool m_enabled = true;
+        /// <summary>Short identifier used to group violations (e.g., "no-default-name").</summary>
+        public string m_id = "";
+        /// <summary>Severity of a violation: Info, Warning, or Error.</summary>
+        public LintSeverity m_severity = LintSeverity.Warning;
+        /// <summary>Which objects the rule applies to.</summary>
+        public LintScope m_scope = LintScope.All;
+        /// <summary>Scope parameter (tag name, layer name, prefix, or regex). Unused for All/RootOnly.</summary>
+        public string m_scopeValue = "";
+        /// <summary>What must hold for objects in scope.</summary>
+        public LintAssert m_assert = LintAssert.NoDefaultName;
+        /// <summary>Assertion parameter (regex, parent name/component, or max depth number).</summary>
+        public string m_assertValue = "";
+        /// <summary>Human message shown in the tooltip and the Lint tab.</summary>
+        public string m_message = "";
+
+        // Per-rule caches (resolved layer index, compiled regexes, parsed int), mirroring
+        // AutoColorRule. Cleared whenever the config changes.
+        [System.NonSerialized] internal int m_cachedLayer;
+        [System.NonSerialized] internal string m_cachedLayerFor;
+        [System.NonSerialized] internal System.Text.RegularExpressions.Regex m_cachedScopeRegex;
+        [System.NonSerialized] internal string m_cachedScopeRegexFor;
+        [System.NonSerialized] internal System.Text.RegularExpressions.Regex m_cachedAssertRegex;
+        [System.NonSerialized] internal string m_cachedAssertRegexFor;
+        [System.NonSerialized] internal int m_cachedInt;
+        [System.NonSerialized] internal string m_cachedIntFor;
+        // Resolved display strings, cached per scan (invariant per rule); cleared on config change.
+        [System.NonSerialized] internal string m_cachedRuleId;
+        [System.NonSerialized] internal string m_cachedMessage;
+    }
+
     #region Public
 
     [Header("Display")]
@@ -86,6 +134,27 @@ public class ChromaConfig : ScriptableObject
     public Color m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
     [Tooltip("Show a warning icon on rows whose GameObject has a missing (deleted) script component")]
     public bool m_warnMissingScripts = true;
+
+    [Header("Row widgets")]
+    [Tooltip("Always-visible activation checkbox at the right edge of every row (click toggles SetActive, with Undo)")]
+    public bool m_showActiveToggle = true;
+    [Tooltip("Show the icons of each GameObject's components at the right edge of the row")]
+    public bool m_showComponentIcons = true;
+    [Range(1, 8)]
+    [Tooltip("Maximum number of component icons shown per row")]
+    public int m_maxComponentIcons = 4;
+
+    [Header("Selection accent")]
+    [Tooltip("Tint the selected hierarchy row with the theme accent (stays visible even on banner rows, which hide the native blue highlight)")]
+    public bool m_selectionAccent = true;
+    [Tooltip("Accent color (and alpha) washed over the selected row. Themes reseed this from their primary color")]
+    public Color m_selectionAccentColor = new Color(0.27f, 0.52f, 1f, 0.18f);
+
+    [Header("Scene View")]
+    [Tooltip("Draw a floating colored name label above each banner-colored object in the Scene View")]
+    public bool m_sceneLabels = false;
+    [Tooltip("Draw a colored wireframe marker around each banner-colored object in the Scene View")]
+    public bool m_sceneGizmos = false;
 
     [Header("Folder colors (Project window)")]
     [Tooltip("Enable color tinting for folders in the Project window")]
@@ -127,6 +196,14 @@ public class ChromaConfig : ScriptableObject
     [Tooltip("Rules to automatically tint rows by Tag, Layer, name prefix, or regex match")]
     public List<AutoColorRule> m_autoColorRules = new List<AutoColorRule>();
 
+    [Header("Convention linter")]
+    [Tooltip("Scan open scenes against the team's lint rules and flag violations")]
+    public bool m_enableLint = true;
+    [Tooltip("Show a severity icon (with tooltip) on rows that violate a lint rule")]
+    public bool m_lintShowIcons = true;
+    [Tooltip("Team lint rules: scope (which objects) + assertion (what must hold) + severity + message")]
+    public List<LintRule> m_lintRules = new List<LintRule>();
+
     [Header("Build")]
     [Tooltip("Strip Chroma specs from GameObject names in built scenes (#1f6feb center bold=Title becomes Title). Scene assets are not modified")]
     public bool m_stripNamesInBuild = true;
@@ -160,6 +237,9 @@ public class ChromaConfig : ScriptableObject
     /// <summary>Internal version stamp; bumped on every config edit from the window to notify listeners.</summary>
     public int m_version;
 
+    /// <summary>Schema version for data migrations. Independent from m_version (which is an edit counter).</summary>
+    public int m_schemaVersion;
+
     #endregion
 
 
@@ -178,30 +258,25 @@ public class ChromaConfig : ScriptableObject
 
     #region Migration
 
-    /// <summary>Run migrations if this config is older than the current version. Preserves all user settings.</summary>
+    /// <summary>
+    /// Run migrations if this config is older than the current schema. Preserves all user settings.
+    /// Uses m_schemaVersion (NOT m_version, which is bumped on every edit and therefore useless
+    /// as a migration gate — that was a v0.2 design bug).
+    /// </summary>
     private void MigrateIfNeeded()
     {
-        const int CURRENT_VERSION = 2;
-        if (m_version >= CURRENT_VERSION) return;
+        const int CURRENT_SCHEMA = 4;
+        if (m_schemaVersion >= CURRENT_SCHEMA) return;
 
-        // Migration chain: each version upgrades to the next
-        if (m_version < 2) MigrateV1ToV2();
-
-        m_version = CURRENT_VERSION;
-        Debug.Log($"[Chroma] Config migrated to version {CURRENT_VERSION}. All user settings preserved.");
+        // Migration chain: each schema upgrades to the next.
+        // v2 (RGB themes), v3 (lint rules + row widgets) and v4 (selection accent + Scene View)
+        // only ADD fields with safe defaults, so deserialization handles them — nothing to rewrite.
+        m_schemaVersion = CURRENT_SCHEMA;
     }
 
-    /// <summary>Version 1→2: Added RGB themes (Halloween, Christmas, Valentine).</summary>
-    private void MigrateV1ToV2()
-    {
-        // Default: keep Classic theme (no change to user experience)
-        if (m_rgbTheme == RGBTheme.Classic) return;
-        Debug.Log("[Chroma] V1→V2: RGB themes added. Your current RGB mode is preserved.");
-    }
-
-    // FUTURE MIGRATIONS:
-    // if (m_version < 3) MigrateV2ToV3();
-    // if (m_version < 4) MigrateV3ToV4();
+    // FUTURE MIGRATIONS — add as conditionals BEFORE the unconditional
+    // "m_schemaVersion = CURRENT_SCHEMA;" above, and bump CURRENT_SCHEMA:
+    // if (m_schemaVersion < 5) MigrateV4ToV5();
     // ... and so on
 
     #endregion
@@ -221,6 +296,16 @@ public class ChromaConfig : ScriptableObject
         m_zebra = false;
         m_zebraColor = new Color(1f, 1f, 1f, 0.03f);
         m_warnMissingScripts = true;
+        m_showActiveToggle = true;
+        m_showComponentIcons = true;
+        m_maxComponentIcons = 4;
+        m_selectionAccent = true;
+        m_selectionAccentColor = new Color(0.27f, 0.52f, 1f, 0.18f);
+        m_sceneLabels = false;
+        m_sceneGizmos = false;
+        m_enableLint = true;
+        m_lintShowIcons = true;
+        m_lintRules = StarterLintRules();
         m_enableFolderColors = true;
         m_folderColors = new List<FolderColor>();
         m_enableSeparators = true;
@@ -251,6 +336,39 @@ public class ChromaConfig : ScriptableObject
             new Preset { m_key = "cat",  m_spec = "#444 left bold text:white" },
             new Preset { m_key = "grad", m_spec = "#1f6feb>#7b2ff7 center bold text:white" },
         };
+    }
+
+    /// <summary>
+    /// Gentle default ruleset: catches real mistakes (missing scripts, default names, empty
+    /// objects) without imposing any team-specific structure.
+    /// </summary>
+    public static List<LintRule> StarterLintRules()
+    {
+        return new List<LintRule>
+        {
+            new LintRule { m_id = "no-missing-script", m_severity = LintSeverity.Error,
+                m_assert = LintAssert.NoMissingScript,
+                m_message = "Missing (deleted) script on this GameObject." },
+            new LintRule { m_id = "no-default-name", m_severity = LintSeverity.Warning,
+                m_assert = LintAssert.NoDefaultName,
+                m_message = "Default name — rename it to something meaningful." },
+            new LintRule { m_id = "no-empty-object", m_severity = LintSeverity.Info,
+                m_assert = LintAssert.NoEmpty,
+                m_message = "Empty GameObject (no components, no children)." },
+        };
+    }
+
+    /// <summary>Stricter ruleset for teams: starter rules + scene-structure conventions.</summary>
+    public static List<LintRule> StrictLintRules()
+    {
+        List<LintRule> rules = StarterLintRules();
+        rules.Add(new LintRule { m_id = "root-needs-banner", m_severity = LintSeverity.Warning,
+            m_scope = LintScope.RootOnly, m_assert = LintAssert.HasBanner,
+            m_message = "Root objects should carry a Chroma banner so the scene reads at a glance." });
+        rules.Add(new LintRule { m_id = "max-depth", m_severity = LintSeverity.Warning,
+            m_assert = LintAssert.MaxDepth, m_assertValue = "8",
+            m_message = "Nested deeper than 8 levels — consider flattening." });
+        return rules;
     }
 
     /// <summary>Load the project's ChromaConfig, or create one with default settings if none exists.</summary>
@@ -332,6 +450,36 @@ public class ChromaConfig : ScriptableObject
             rule.m_cachedRegexFor = null;
             rule.m_cachedLayer = 0;
             rule.m_cachedLayerFor = null;
+        }
+
+        // Clamp row-widget options
+        m_maxComponentIcons = Mathf.Clamp(m_maxComponentIcons, 1, 8);
+
+        // Validate and limit lint rules
+        if (m_lintRules == null) m_lintRules = new List<LintRule>();
+        if (m_lintRules.Count > maxRules) m_lintRules.RemoveRange(maxRules, m_lintRules.Count - maxRules);
+        for (int i = 0; i < m_lintRules.Count; i++)
+        {
+            LintRule rule = m_lintRules[i];
+            if (rule == null) continue;
+
+            if (!string.IsNullOrEmpty(rule.m_id) && rule.m_id.Length > 100)
+                rule.m_id = rule.m_id.Substring(0, 100);
+            if (!string.IsNullOrEmpty(rule.m_scopeValue) && rule.m_scopeValue.Length > maxRegexLen)
+                rule.m_scopeValue = rule.m_scopeValue.Substring(0, maxRegexLen);
+            if (!string.IsNullOrEmpty(rule.m_assertValue) && rule.m_assertValue.Length > maxRegexLen)
+                rule.m_assertValue = rule.m_assertValue.Substring(0, maxRegexLen);
+            if (!string.IsNullOrEmpty(rule.m_message) && rule.m_message.Length > maxStringLen)
+                rule.m_message = rule.m_message.Substring(0, maxStringLen);
+
+            // Clear caches so regexes recompile with the timeout
+            rule.m_cachedScopeRegex = null;
+            rule.m_cachedScopeRegexFor = null;
+            rule.m_cachedAssertRegex = null;
+            rule.m_cachedAssertRegexFor = null;
+            rule.m_cachedLayer = 0;
+            rule.m_cachedLayerFor = null;
+            rule.m_cachedIntFor = null;
         }
 
         // Validate presets
